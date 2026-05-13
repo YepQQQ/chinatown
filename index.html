@@ -11,7 +11,7 @@
     <title>霓虹唐埠 - 手机原型 P0</title>
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="icon" href="/assets/app-icon.svg" />
-    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="styles.css?v=fixed-status-3" />
   </head>
   <body>
     <main class="entry-shell screen is-active" id="homeScreen">
@@ -101,7 +101,7 @@
           <span class="label">轮次</span>
           <strong>1 / 6</strong>
         </div>
-        <div class="phase-pill" id="roomPhasePill">自由交易</div>
+        <div class="phase-pill">自由交易</div>
         <div class="cash">
           <span class="label">现金</span>
           <strong>50 万</strong>
@@ -119,35 +119,54 @@
 
       <section class="board-panel">
         <div class="board-toolbar">
-          <div>
-            <span class="label">唐埠地契图</span>
-            <strong>6 街区 · 85 地块</strong>
+          <div class="turn-strip">
+            <span>当前轮数：<b id="roundLabel">1/6轮</b></span>
+            <span>我的金钱：<b id="cashLabel">5万元</b></span>
           </div>
           <div class="selected-summary" id="selectedSummary">未选择地块</div>
-          <button class="trade-action" id="startTradeButton" type="button">发起交易</button>
-          <button id="hintButton" type="button">提示</button>
+          <div class="side-actions">
+            <button id="playersButton" type="button">玩家</button>
+            <button id="hintButton" type="button">提示</button>
+          </div>
         </div>
         <div class="board-wrap" id="boardWrap">
           <div class="board" id="board" aria-label="85 个地块地图"></div>
+          <div class="map-measure" id="mapMeasure" aria-hidden="true"></div>
         </div>
       </section>
 
-      <section class="bottom-drawer">
-        <nav class="tabs" aria-label="操作标签">
-          <button class="tab is-active" data-tab="cards" type="button">地块</button>
-          <button class="tab" data-tab="shops" type="button">商铺</button>
-        </nav>
+      <aside class="side-panel" aria-label="游戏操作">
+        <section class="bottom-drawer">
+          <nav class="tabs" aria-label="操作标签">
+            <button class="tab is-active" data-tab="cards" type="button">地块</button>
+            <button class="tab" data-tab="shops" type="button">商铺</button>
+          </nav>
 
-        <div class="tab-panel is-active" id="cards">
-          <div class="card-row" id="cardRow"></div>
-        </div>
+          <div class="tab-panel is-active" id="cards">
+            <div class="card-row" id="cardRow"></div>
+          </div>
 
-        <div class="tab-panel" id="shops">
-          <div class="shop-grid" id="shopGrid"></div>
-        </div>
+          <div class="tab-panel" id="shops">
+            <div class="shop-grid" id="shopGrid"></div>
+          </div>
+        </section>
 
-      </section>
+        <button class="floating-trade" id="startTradeButton" type="button">发起交易</button>
+      </aside>
     </main>
+
+    <div class="modal-backdrop" id="playersModal" aria-hidden="true">
+      <section class="hint-modal players-modal" role="dialog" aria-modal="true" aria-labelledby="playersTitle">
+        <div class="hint-head">
+          <div>
+            <span class="label">玩家信息</span>
+            <h2 id="playersTitle">本局玩家</h2>
+          </div>
+          <button id="closePlayers" type="button">关闭</button>
+        </div>
+        <div class="player-modal-list" id="playerModalList"></div>
+      </section>
+    </div>
 
     <div class="modal-backdrop" id="hintModal" aria-hidden="true">
       <section class="hint-modal" role="dialog" aria-modal="true" aria-labelledby="hintTitle">
@@ -163,6 +182,6 @@
     </div>
 
     <script src="/socket.io/socket.io.js"></script>
-    <script src="app.js"></script>
+    <script src="app.js?v=fixed-status-3"></script>
   </body>
 </html>

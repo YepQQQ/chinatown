@@ -17,6 +17,9 @@ const playerPresets = [
   { name: "阿青", color: "green", stats: "0 地块 · 0 商铺" },
 ];
 
+const MAP_WIDTH = 2028;
+const MAP_HEIGHT = 1404;
+
 function makeLotBlock(xs, ys, rows) {
   return rows.flatMap((row, rowIndex) => row
     .map((id, colIndex) => (id ? { id, cx: xs[colIndex], cy: ys[rowIndex] } : null))
@@ -24,42 +27,42 @@ function makeLotBlock(xs, ys, rows) {
 }
 
 const lotLayout = [
-  ...makeLotBlock([96, 129, 162, 195], [35, 69, 106, 142, 178], [
+  ...makeLotBlock([240, 350, 458, 566], [279, 389, 500, 610, 720], [
     [null, 1, 2, null],
     [null, 3, 4, 5],
     [6, 7, 8, 9],
     [10, 11, 12, null],
     [13, 14, 15, null],
   ]),
-  ...makeLotBlock([250, 284, 319], [35, 70, 106, 142, 178], [
+  ...makeLotBlock([722, 836, 948], [279, 389, 500, 610, 720], [
     [16, 17, 18],
     [19, 20, 21],
     [22, 23, null],
     [26, 27, null],
     [24, 25, null],
   ]),
-  ...makeLotBlock([359, 404, 449, 490], [35, 70, 106, 142, 178], [
+  ...makeLotBlock([1109, 1225, 1337, 1454], [279, 389, 500, 610, 720], [
     [28, 29, 30, null],
     [31, 32, 33, null],
     [34, 35, 36, null],
     [null, 37, 38, 39],
     [null, 40, 41, 42],
   ]),
-  ...makeLotBlock([526, 561, 596, 631], [35, 70, 106, 142, 178], [
+  ...makeLotBlock([1604, 1710, 1817, 1924], [279, 389, 500, 610, 720], [
     [43, 44, 45, 46],
     [47, 48, 49, 50],
     [51, 52, 53, 54],
     [null, null, 55, 56],
     [null, null, 57, 58],
   ]),
-  ...makeLotBlock([278, 317, 356], [230, 265, 300, 335, 370], [
+  ...makeLotBlock([832, 942, 1053], [876, 969, 1062, 1156, 1250], [
     [59, 60, null],
     [61, 62, null],
     [63, 64, 65],
     [66, 67, 68],
     [null, 69, 70],
   ]),
-  ...makeLotBlock([449, 484, 519, 554], [230, 265, 300, 335], [
+  ...makeLotBlock([1355, 1466, 1575, 1686], [876, 969, 1062, 1156], [
     [71, 72, 73, 74],
     [75, 76, 77, 78],
     [79, 80, 81, 82],
@@ -78,6 +81,8 @@ const shops = [
 ];
 
 const board = document.querySelector("#board");
+const boardWrap = document.querySelector("#boardWrap");
+const mapMeasure = document.querySelector("#mapMeasure");
 const homeScreen = document.querySelector("#homeScreen");
 const waitingScreen = document.querySelector("#waitingScreen");
 const starterScreen = document.querySelector("#starterScreen");
@@ -95,12 +100,17 @@ const starterResult = document.querySelector("#starterResult");
 const moneyList = document.querySelector("#moneyList");
 const homeError = document.querySelector("#homeError");
 const lanUrlText = document.querySelector("#lanUrlText");
-const roomPhasePill = document.querySelector("#roomPhasePill");
+const roundLabel = document.querySelector("#roundLabel");
+const cashLabel = document.querySelector("#cashLabel");
 const selectedSummary = document.querySelector("#selectedSummary");
 const cardRow = document.querySelector("#cardRow");
 const shopGrid = document.querySelector("#shopGrid");
 const playersList = document.querySelector("#playersList");
 const playerCountLabel = document.querySelector("#playerCountLabel");
+const playersButton = document.querySelector("#playersButton");
+const playersModal = document.querySelector("#playersModal");
+const playersTitle = document.querySelector("#playersTitle");
+const playerModalList = document.querySelector("#playerModalList");
 const hintModal = document.querySelector("#hintModal");
 const socket = typeof io === "function" ? io() : null;
 const params = new URLSearchParams(window.location.search);
@@ -120,6 +130,29 @@ function showScreen(screen) {
     item.classList.toggle("is-active", item === screen);
   });
   document.body.classList.toggle("game-active", screen === gameScreen);
+
+  if (screen === gameScreen) {
+    requestAnimationFrame(resizeBoardToContain);
+  }
+}
+
+function resizeBoardToContain() {
+  const wrapWidth = boardWrap.clientWidth;
+  const wrapHeight = boardWrap.clientHeight;
+  if (!wrapWidth || !wrapHeight) return;
+
+  const mapRatio = MAP_WIDTH / MAP_HEIGHT;
+  const wrapRatio = wrapWidth / wrapHeight;
+  const boardWidth = wrapRatio > mapRatio ? wrapHeight * mapRatio : wrapWidth;
+  const boardHeight = wrapRatio > mapRatio ? wrapHeight : wrapWidth / mapRatio;
+
+  board.style.width = `${boardWidth}px`;
+  board.style.height = `${boardHeight}px`;
+  const frameRatio = wrapWidth / wrapHeight;
+  const renderedRatio = boardWidth / boardHeight;
+  const measureText = `框 ${Math.round(wrapWidth)}x${Math.round(wrapHeight)} ${frameRatio.toFixed(3)} | 图 ${Math.round(boardWidth)}x${Math.round(boardHeight)} ${renderedRatio.toFixed(3)}`;
+  board.dataset.measure = measureText;
+  mapMeasure.textContent = measureText;
 }
 
 function requestImmersiveMode() {
@@ -212,15 +245,18 @@ function buildLots() {
 }
 
 function getNeighbors(lot) {
-  const tolerance = 9;
+  const sameLineTolerance = 18;
+  const minStep = 82;
+  const maxHorizontalStep = 128;
+  const maxVerticalStep = 124;
 
   return lots.filter((candidate) => {
     if (candidate.id === lot.id) return false;
 
-    const horizontalTouch = Math.abs(candidate.cx - lot.cx) <= 38 + tolerance
-      && Math.abs(candidate.cy - lot.cy) <= tolerance;
-    const verticalTouch = Math.abs(candidate.cy - lot.cy) <= 35 + tolerance
-      && Math.abs(candidate.cx - lot.cx) <= tolerance;
+    const dx = Math.abs(candidate.cx - lot.cx);
+    const dy = Math.abs(candidate.cy - lot.cy);
+    const horizontalTouch = dx >= minStep && dx <= maxHorizontalStep && dy <= sameLineTolerance;
+    const verticalTouch = dy >= minStep && dy <= maxVerticalStep && dx <= sameLineTolerance;
 
     return horizontalTouch || verticalTouch;
   });
@@ -240,8 +276,8 @@ function renderBoard() {
     cell.className = "cell";
     cell.textContent = lot.id;
     cell.dataset.id = String(lot.id);
-    cell.style.setProperty("--x", `${(lot.cx / 720) * 100}%`);
-    cell.style.setProperty("--y", `${(lot.cy / 440) * 100}%`);
+    cell.style.setProperty("--x", `${(lot.cx / MAP_WIDTH) * 100}%`);
+    cell.style.setProperty("--y", `${(lot.cy / MAP_HEIGHT) * 100}%`);
 
     if (owner) {
       cell.classList.add(owner.className);
@@ -259,9 +295,12 @@ function renderBoard() {
 
 function renderPlayers() {
   playersList.innerHTML = "";
+  playerModalList.innerHTML = "";
   const activePlayers = room?.players || playerPresets.slice(0, selectedRoomSize);
   playersList.className = `player-list count-${activePlayers.length}`;
   playerCountLabel.textContent = `${activePlayers.length}人局`;
+  playersButton.textContent = "玩家";
+  playersTitle.textContent = `${activePlayers.length}人局玩家`;
 
   activePlayers.forEach((player) => {
     const playerEl = document.createElement("article");
@@ -274,6 +313,17 @@ function renderPlayers() {
       </div>
     `;
     playersList.appendChild(playerEl);
+
+    const modalEl = document.createElement("article");
+    modalEl.className = playerEl.className;
+    modalEl.innerHTML = `
+      <span class="avatar ${player.color}"></span>
+      <div>
+        <strong>${player.name}</strong>
+        <small>${player.stats} · 现金 50万</small>
+      </div>
+    `;
+    playerModalList.appendChild(modalEl);
   });
 }
 
@@ -349,8 +399,9 @@ function showBuildingDraft() {
   renderPlayers();
   renderHand();
   renderShops();
-  roomPhasePill.textContent = `${room.code} · 第${currentGame.round}轮选地块`;
-  selectedSummary.textContent = `从 ${currentGame.buildingDealCount} 张候选地块中保留 ${currentGame.buildingKeepCount} 张`;
+  roundLabel.textContent = `${currentGame.round}/6轮`;
+  cashLabel.textContent = "5万元";
+  selectedSummary.textContent = `候选 ${currentGame.buildingDealCount} · 保留 ${currentGame.buildingKeepCount}`;
   showScreen(gameScreen);
 }
 
@@ -520,8 +571,22 @@ document.querySelector("#hintButton").addEventListener("click", () => {
   hintModal.setAttribute("aria-hidden", "false");
 });
 
+playersButton.addEventListener("click", () => {
+  playersModal.setAttribute("aria-hidden", "false");
+});
+
 document.querySelector("#startTradeButton").addEventListener("click", () => {
   selectedSummary.textContent = "交易功能下一步接入：选择对象、地块、商铺和现金。";
+});
+
+document.querySelector("#closePlayers").addEventListener("click", () => {
+  playersModal.setAttribute("aria-hidden", "true");
+});
+
+playersModal.addEventListener("click", (event) => {
+  if (event.target === playersModal) {
+    playersModal.setAttribute("aria-hidden", "true");
+  }
 });
 
 document.querySelector("#closeHint").addEventListener("click", () => {
@@ -564,10 +629,16 @@ renderPlayers();
 renderHand();
 renderShops();
 renderNetworkInfo();
+resizeBoardToContain();
 
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("/sw.js").catch(() => {});
 }
+
+window.addEventListener("resize", resizeBoardToContain);
+window.addEventListener("orientationchange", () => {
+  window.setTimeout(resizeBoardToContain, 160);
+});
 
 if (isCoordMode) {
   document.body.classList.add("coord-mode");

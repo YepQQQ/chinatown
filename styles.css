@@ -532,8 +532,9 @@ input {
 }
 
 .board-wrap {
-  display: grid;
-  place-items: center;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
   min-height: 0;
   overflow: hidden;
   padding: 8px;
@@ -542,19 +543,19 @@ input {
 
 .board {
   position: relative;
-  width: min(100%, 720px);
+  width: min(100%, 2028px);
   max-height: 100%;
-  aspect-ratio: 720 / 440;
+  aspect-ratio: 2028 / 1404;
   border-radius: 10px;
   overflow: hidden;
-  background: #120b05 url("assets/map.png") center / 100% 100% no-repeat;
+  background: #120b05 url("assets/map.png?v=rectangle-2028-1404") center / 100% 100% no-repeat;
 }
 
 .cell {
-  --cell-w: 4.72%;
-  --cell-h: 7.72%;
-  --cell-half-w: 2.36%;
-  --cell-half-h: 3.86%;
+  --cell-w: 5.3%;
+  --cell-h: 7.8%;
+  --cell-half-w: 2.65%;
+  --cell-half-h: 3.9%;
   z-index: 2;
   position: absolute;
   display: grid;
@@ -1009,5 +1010,413 @@ input {
 
   .selected-summary {
     max-width: 104px;
+  }
+}
+
+#gameScreen {
+  overflow: hidden;
+}
+
+#gameScreen > .top-bar,
+#gameScreen > .players {
+  display: none;
+}
+
+#gameScreen.app-shell {
+  display: block;
+  width: 100vw;
+  max-width: none;
+  height: 100svh;
+  padding: max(4px, env(safe-area-inset-top)) max(6px, env(safe-area-inset-right)) max(4px, env(safe-area-inset-bottom)) max(6px, env(safe-area-inset-left));
+}
+
+#gameScreen .board-panel {
+  position: absolute;
+  inset: max(4px, env(safe-area-inset-top)) max(6px, env(safe-area-inset-right)) max(4px, env(safe-area-inset-bottom)) max(6px, env(safe-area-inset-left));
+  display: grid;
+  grid-template-rows: 1fr;
+  border-radius: 8px;
+}
+
+#gameScreen .board-toolbar {
+  position: absolute;
+  z-index: 4;
+  top: 8px;
+  left: 8px;
+  right: 8px;
+  display: grid;
+  grid-template-columns: auto minmax(128px, auto) minmax(0, 1fr) auto auto;
+  min-height: 36px;
+  padding: 5px 6px;
+  border: 1px solid rgba(214, 167, 58, 0.36);
+  border-radius: 8px;
+  background: rgba(22, 13, 6, 0.86);
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.28);
+}
+
+#gameScreen .board-toolbar .label {
+  display: none;
+}
+
+#gameScreen .board-toolbar strong {
+  font-size: 13px;
+}
+
+.turn-strip {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  padding: 4px 7px;
+  border: 1px solid rgba(16, 201, 193, 0.34);
+  border-radius: 999px;
+  background: rgba(16, 201, 193, 0.08);
+  color: #bdfdf9;
+  font-family: "PingFang SC", sans-serif;
+  font-size: 11px;
+}
+
+.turn-strip b {
+  max-width: 124px;
+  overflow: hidden;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#gameScreen .selected-summary {
+  max-width: none;
+  min-width: 0;
+  padding: 5px 8px;
+}
+
+#gameScreen .board-wrap {
+  width: 100%;
+  height: 100%;
+  padding: 0;
+}
+
+#gameScreen .board {
+  width: auto;
+  height: 100%;
+  max-width: 100%;
+  max-height: 100%;
+  border-radius: 7px;
+}
+
+#gameScreen .bottom-drawer {
+  position: absolute;
+  z-index: 5;
+  left: 10px;
+  bottom: max(8px, env(safe-area-inset-bottom));
+  width: min(620px, calc(100vw - 160px));
+  min-height: 0;
+  border-radius: 8px;
+  background: rgba(22, 13, 6, 0.88);
+  box-shadow: 0 14px 38px rgba(0, 0, 0, 0.36);
+}
+
+#gameScreen .tabs {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+#gameScreen .tab {
+  min-height: 28px;
+}
+
+#gameScreen .tab-panel {
+  min-height: 0;
+  padding: 7px;
+}
+
+#gameScreen .deed-card {
+  flex-basis: 58px;
+  height: 68px;
+  padding: 6px;
+}
+
+#gameScreen .deed-card strong {
+  margin-top: 5px;
+  font-size: 20px;
+}
+
+.floating-trade {
+  position: absolute;
+  z-index: 6;
+  right: max(10px, env(safe-area-inset-right));
+  bottom: max(12px, env(safe-area-inset-bottom));
+  min-height: 46px;
+  padding: 0 18px;
+  border: 1px solid rgba(217, 74, 55, 0.66);
+  border-radius: 999px;
+  background: linear-gradient(135deg, rgba(217, 74, 55, 0.94), rgba(116, 36, 25, 0.94));
+  color: #fff1e9;
+  box-shadow: 0 12px 30px rgba(217, 74, 55, 0.28);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.player-modal-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.players-modal {
+  max-width: 520px;
+}
+
+.players-modal .player {
+  min-height: 54px;
+  padding: 10px;
+  border: 1px solid rgba(214, 167, 58, 0.22);
+}
+
+@media (orientation: portrait) {
+  .game-active #gameScreen.app-shell {
+    position: fixed;
+    top: 0;
+    left: 100vw;
+    width: 100svh;
+    height: 100vw;
+    transform: rotate(90deg);
+    transform-origin: top left;
+  }
+
+  .game-active #gameScreen .bottom-drawer {
+    width: min(620px, calc(100svh - 160px));
+  }
+}
+
+#gameScreen.app-shell {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) clamp(168px, 21vw, 218px);
+  grid-template-rows: minmax(0, 1fr);
+  grid-template-areas: "map side";
+  gap: 6px;
+}
+
+#gameScreen .board-panel {
+  position: relative;
+  inset: auto;
+  grid-area: map;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+#gameScreen .side-panel {
+  grid-area: side;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 6px;
+  min-width: 0;
+  min-height: 0;
+}
+
+#gameScreen .board-toolbar {
+  position: static !important;
+  inset: auto !important;
+  z-index: auto;
+  display: grid !important;
+  grid-template-columns: auto minmax(150px, 1fr) 104px !important;
+  align-items: center;
+  width: 100% !important;
+  gap: 6px;
+  height: 44px;
+  min-height: 44px;
+  max-height: 44px;
+  padding: 5px 7px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  background:
+    linear-gradient(180deg, rgba(55, 36, 18, 0.78), rgba(16, 10, 5, 0.88)),
+    rgba(22, 13, 6, 0.86);
+  box-shadow: none;
+}
+
+#gameScreen .turn-strip {
+  display: grid;
+  grid-template-columns: repeat(2, max-content);
+  align-items: center;
+  gap: 12px;
+  height: 32px;
+  min-height: 0;
+  justify-content: start;
+  width: 100%;
+  padding: 0 2px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: #e8d7a4;
+}
+
+#gameScreen .turn-strip span,
+#gameScreen .turn-strip b {
+  overflow: hidden;
+  font-family: "PingFang SC", sans-serif;
+  font-size: 11px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+#gameScreen .turn-strip b {
+  color: var(--paper);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+#gameScreen .selected-summary {
+  width: 100%;
+  max-width: none;
+  height: 32px;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 10px;
+  border-color: rgba(16, 201, 193, 0.42);
+  border-radius: 7px;
+  background: rgba(16, 201, 193, 0.08);
+  color: #c8fffb;
+  font-size: 12px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.side-actions {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px;
+  width: 104px;
+}
+
+#gameScreen .board-toolbar button {
+  width: 100%;
+  height: 32px;
+  min-height: 0;
+  min-width: 50px;
+  padding: 0 6px;
+  border-radius: 7px;
+  background: rgba(214, 167, 58, 0.13);
+  font-size: 12px;
+}
+
+#gameScreen .board-wrap {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.18);
+}
+
+#gameScreen .board {
+  flex: 0 0 auto;
+  max-width: 100%;
+  max-height: 100%;
+}
+
+.map-measure {
+  position: absolute;
+  left: 6px;
+  top: 6px;
+  z-index: 8;
+  display: none;
+  padding: 4px 6px;
+  border: 1px solid rgba(16, 201, 193, 0.42);
+  border-radius: 6px;
+  color: #bdfdf9;
+  background: rgba(8, 5, 3, 0.78);
+  font: 700 10px/1.2 "Courier New", monospace;
+}
+
+.coord-mode .map-measure {
+  display: block;
+}
+
+#gameScreen .bottom-drawer {
+  position: static !important;
+  inset: auto !important;
+  display: grid !important;
+  grid-template-rows: auto minmax(0, 1fr);
+  flex: 1 1 auto;
+  width: 100% !important;
+  min-width: 0;
+  min-height: 0;
+  border-radius: 8px;
+  background: var(--panel);
+  box-shadow: var(--shadow);
+}
+
+#gameScreen .side-panel .bottom-drawer {
+  flex: 1 1 auto;
+}
+
+#gameScreen .card-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(58px, 1fr));
+  align-content: start;
+  gap: 6px;
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-bottom: 0;
+}
+
+#gameScreen .deed-card {
+  width: 100%;
+  min-width: 0;
+  flex: none;
+  height: 76px;
+}
+
+#gameScreen .shop-grid {
+  grid-template-columns: 1fr;
+  align-content: start;
+  height: 100%;
+  overflow-y: auto;
+}
+
+#gameScreen .floating-trade {
+  position: static !important;
+  inset: auto !important;
+  flex: 0 0 auto;
+  width: 100% !important;
+  min-height: 44px;
+  border-radius: 8px;
+}
+
+@media (orientation: portrait) {
+  .game-active #gameScreen.app-shell {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) clamp(168px, 21vw, 218px);
+    grid-template-rows: minmax(0, 1fr);
+  }
+
+  .game-active #gameScreen .bottom-drawer {
+    width: auto;
+  }
+
+  .game-active .modal-backdrop {
+    top: 0;
+    left: 100vw;
+    width: 100svh;
+    height: 100vw;
+    padding: 12px;
+    place-items: center;
+    transform: rotate(90deg);
+    transform-origin: top left;
+  }
+
+  .game-active .hint-modal {
+    width: min(520px, calc(100svh - 24px));
+    max-height: calc(100vw - 24px);
+    overflow: auto;
   }
 }
