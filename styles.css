@@ -548,22 +548,18 @@ input {
   aspect-ratio: 2028 / 1404;
   border-radius: 10px;
   overflow: hidden;
-  background: #120b05 url("assets/map.png?v=rectangle-2028-1404") center / 100% 100% no-repeat;
+  background: #120b05 url("assets/map.png?v=shop-stack-3") center / 100% 100% no-repeat;
 }
 
 .cell {
-  --cell-w: 5.3%;
-  --cell-h: 7.8%;
-  --cell-half-w: 2.65%;
-  --cell-half-h: 3.9%;
   z-index: 2;
   position: absolute;
   display: grid;
   place-items: center;
-  width: var(--cell-w);
-  height: var(--cell-h);
-  left: calc(var(--x) - var(--cell-half-w));
-  top: calc(var(--y) - var(--cell-half-h));
+  width: var(--w);
+  height: var(--h);
+  left: var(--x);
+  top: var(--y);
   border: 1px solid transparent;
   border-radius: 4px;
   color: transparent;
@@ -582,6 +578,10 @@ input {
 
 .cell.owner-gold {
   box-shadow: inset 0 0 0 2px rgba(214, 167, 58, 0.82), 0 0 14px rgba(214, 167, 58, 0.24);
+}
+
+.cell.owner-green {
+  box-shadow: inset 0 0 0 2px rgba(88, 192, 109, 0.82), 0 0 14px rgba(88, 192, 109, 0.24);
 }
 
 .cell.has-shop::after {
@@ -610,9 +610,10 @@ input {
 
 .coord-mode .cell,
 .coord-mode .cell.is-selected {
-  border: 0;
+  border: 1px solid rgba(255, 74, 61, 0.72);
+  border-radius: 4px;
   color: transparent;
-  background: transparent;
+  background: rgba(255, 74, 61, 0.08);
   box-shadow: none;
   font-size: 0;
 }
@@ -686,6 +687,17 @@ input {
   background: linear-gradient(160deg, rgba(214, 167, 58, 0.18), rgba(20, 12, 5, 0.88));
 }
 
+.deed-card.is-kept {
+  border-color: rgba(16, 201, 193, 0.8);
+  background:
+    linear-gradient(160deg, rgba(16, 201, 193, 0.26), rgba(20, 12, 5, 0.9));
+  box-shadow: inset 0 0 0 1px rgba(16, 201, 193, 0.28), 0 0 14px rgba(16, 201, 193, 0.18);
+}
+
+.deed-card:disabled {
+  opacity: 0.72;
+}
+
 .deed-card strong {
   display: block;
   margin-top: 18px;
@@ -714,8 +726,108 @@ input {
   background: rgba(16, 201, 193, 0.08);
 }
 
+.shop-card {
+  position: relative;
+  display: block;
+  aspect-ratio: 9 / 8;
+  min-height: 0;
+  padding: 0;
+  width: 100%;
+  overflow: visible;
+  color: var(--paper);
+  background: rgba(0, 0, 0, 0.2);
+  animation: dealIn 360ms ease both;
+}
+
+.shop-card img {
+  display: block;
+  position: absolute;
+  inset: 6px;
+  width: calc(100% - 12px);
+  height: calc(100% - 12px);
+  border-radius: 5px;
+  object-fit: contain;
+}
+
+.shop-card > strong {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: grid;
+  place-items: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border: 1px solid rgba(255, 235, 165, 0.72);
+  border-radius: 999px;
+  color: #fff4c5;
+  background: rgba(30, 18, 6, 0.88);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.38);
+  font: 800 12px/1 "PingFang SC", sans-serif;
+}
+
+.shop-card.is-selected {
+  border-color: rgba(214, 167, 58, 0.86);
+  background: rgba(214, 167, 58, 0.14);
+  box-shadow: inset 0 0 0 1px rgba(214, 167, 58, 0.22), 0 0 14px rgba(214, 167, 58, 0.2);
+}
+
 .shop-chip.wide {
   grid-column: 1 / -1;
+}
+
+.shop-chip.is-dealing {
+  animation: pulseDeal 720ms ease infinite alternate;
+}
+
+.draft-action {
+  display: grid;
+  margin-top: 8px;
+}
+
+.confirm-draft {
+  min-height: 38px;
+  border: 1px solid rgba(16, 201, 193, 0.42);
+  border-radius: 7px;
+  background: linear-gradient(135deg, rgba(16, 201, 193, 0.2), rgba(16, 91, 91, 0.28));
+  color: #d7fffb;
+  font: 700 13px/1 "PingFang SC", sans-serif;
+}
+
+.confirm-draft:disabled {
+  border-color: rgba(214, 167, 58, 0.22);
+  background: rgba(88, 66, 31, 0.26);
+  color: var(--muted);
+}
+
+.draft-note {
+  margin: 0;
+  color: var(--muted);
+  font: 12px/1.4 "PingFang SC", sans-serif;
+}
+
+@keyframes dealIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.96);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes pulseDeal {
+  from {
+    border-color: rgba(16, 201, 193, 0.28);
+    transform: translateY(0);
+  }
+
+  to {
+    border-color: rgba(16, 201, 193, 0.76);
+    transform: translateY(-1px);
+  }
 }
 
 .app-shell {
@@ -1129,6 +1241,11 @@ input {
   padding: 7px;
 }
 
+#gameScreen #cards.is-active {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+}
+
 #gameScreen .deed-card {
   flex-basis: 58px;
   height: 68px;
@@ -1363,7 +1480,7 @@ input {
   grid-template-columns: repeat(2, minmax(58px, 1fr));
   align-content: start;
   gap: 6px;
-  height: 100%;
+  min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
   padding-bottom: 0;
@@ -1376,10 +1493,20 @@ input {
   height: 76px;
 }
 
+#gameScreen .draft-action {
+  margin-top: 6px;
+}
+
+#gameScreen .confirm-draft {
+  min-height: 34px;
+  font-size: 12px;
+}
+
 #gameScreen .shop-grid {
-  grid-template-columns: 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   align-content: start;
   height: 100%;
+  gap: 7px;
   overflow-y: auto;
 }
 

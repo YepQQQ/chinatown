@@ -1,13 +1,8 @@
-const owners = {
-  7: { name: "你", className: "owner-red", shop: "茶" },
-  12: { name: "你", className: "owner-red" },
-  18: { name: "你", className: "owner-red", shop: "药" },
-  24: { name: "阿明", className: "owner-cyan", shop: "饭" },
-  31: { name: "阿明", className: "owner-cyan" },
-  43: { name: "阿明", className: "owner-cyan", shop: "鱼" },
-  51: { name: "小林", className: "owner-gold" },
-  62: { name: "小林", className: "owner-gold", shop: "洗" },
-  78: { name: "小林", className: "owner-gold" },
+const ownerClassByColor = {
+  red: "owner-red",
+  cyan: "owner-cyan",
+  gold: "owner-gold",
+  green: "owner-green",
 };
 
 const playerPresets = [
@@ -20,64 +15,120 @@ const playerPresets = [
 const MAP_WIDTH = 2028;
 const MAP_HEIGHT = 1404;
 
-function makeLotBlock(xs, ys, rows) {
-  return rows.flatMap((row, rowIndex) => row
-    .map((id, colIndex) => (id ? { id, cx: xs[colIndex], cy: ys[rowIndex] } : null))
-    .filter(Boolean));
+function lot(id, x, y, w, h) {
+  return {
+    id,
+    x,
+    y,
+    w,
+    h,
+    cx: x + w / 2,
+    cy: y + h / 2,
+  };
 }
 
 const lotLayout = [
-  ...makeLotBlock([240, 350, 458, 566], [279, 389, 500, 610, 720], [
-    [null, 1, 2, null],
-    [null, 3, 4, 5],
-    [6, 7, 8, 9],
-    [10, 11, 12, null],
-    [13, 14, 15, null],
-  ]),
-  ...makeLotBlock([722, 836, 948], [279, 389, 500, 610, 720], [
-    [16, 17, 18],
-    [19, 20, 21],
-    [22, 23, null],
-    [26, 27, null],
-    [24, 25, null],
-  ]),
-  ...makeLotBlock([1109, 1225, 1337, 1454], [279, 389, 500, 610, 720], [
-    [28, 29, 30, null],
-    [31, 32, 33, null],
-    [34, 35, 36, null],
-    [null, 37, 38, 39],
-    [null, 40, 41, 42],
-  ]),
-  ...makeLotBlock([1604, 1710, 1817, 1924], [279, 389, 500, 610, 720], [
-    [43, 44, 45, 46],
-    [47, 48, 49, 50],
-    [51, 52, 53, 54],
-    [null, null, 55, 56],
-    [null, null, 57, 58],
-  ]),
-  ...makeLotBlock([832, 942, 1053], [876, 969, 1062, 1156, 1250], [
-    [59, 60, null],
-    [61, 62, null],
-    [63, 64, 65],
-    [66, 67, 68],
-    [null, 69, 70],
-  ]),
-  ...makeLotBlock([1355, 1466, 1575, 1686], [876, 969, 1062, 1156], [
-    [71, 72, 73, 74],
-    [75, 76, 77, 78],
-    [79, 80, 81, 82],
-    [83, 84, 85, null],
-  ]),
+  lot(1, 310, 245, 78, 78),
+  lot(2, 420, 245, 78, 78),
+  lot(3, 310, 355, 78, 78),
+  lot(4, 420, 355, 78, 78),
+  lot(5, 530, 355, 78, 78),
+  lot(6, 200, 465, 78, 78),
+  lot(7, 310, 465, 78, 78),
+  lot(8, 420, 465, 78, 78),
+  lot(9, 530, 465, 78, 78),
+  lot(10, 200, 575, 78, 78),
+  lot(11, 310, 575, 78, 78),
+  lot(12, 420, 575, 78, 78),
+  lot(13, 200, 685, 78, 78),
+  lot(14, 310, 685, 78, 78),
+  lot(15, 420, 685, 78, 78),
+  lot(16, 688, 245, 78, 78),
+  lot(17, 798, 245, 78, 78),
+  lot(18, 908, 245, 78, 78),
+  lot(19, 688, 355, 78, 78),
+  lot(20, 798, 355, 78, 78),
+  lot(21, 908, 355, 78, 78),
+  lot(22, 688, 465, 78, 78),
+  lot(23, 798, 465, 78, 78),
+  lot(24, 688, 575, 78, 78),
+  lot(25, 798, 575, 78, 78),
+  lot(26, 688, 685, 78, 78),
+  lot(27, 798, 685, 78, 78),
+  lot(28, 1081, 245, 78, 78),
+  lot(29, 1191, 245, 78, 78),
+  lot(30, 1301, 245, 78, 78),
+  lot(31, 1081, 355, 78, 78),
+  lot(32, 1191, 355, 78, 78),
+  lot(33, 1301, 355, 78, 78),
+  lot(34, 1081, 465, 78, 78),
+  lot(35, 1191, 465, 78, 78),
+  lot(36, 1301, 465, 78, 78),
+  lot(37, 1191, 575, 78, 78),
+  lot(38, 1301, 575, 78, 78),
+  lot(39, 1411, 575, 78, 78),
+  lot(40, 1191, 685, 78, 78),
+  lot(41, 1301, 685, 78, 78),
+  lot(42, 1411, 685, 78, 78),
+  lot(43, 1564, 247, 78, 78),
+  lot(44, 1666, 247, 78, 78),
+  lot(45, 1774, 247, 78, 78),
+  lot(46, 1876, 247, 78, 78),
+  lot(47, 1564, 357, 78, 78),
+  lot(48, 1666, 357, 78, 78),
+  lot(49, 1774, 357, 78, 78),
+  lot(50, 1876, 357, 78, 78),
+  lot(51, 1564, 467, 78, 78),
+  lot(52, 1666, 467, 78, 78),
+  lot(53, 1774, 467, 78, 78),
+  lot(54, 1876, 467, 78, 78),
+  lot(55, 1774, 579, 78, 78),
+  lot(56, 1876, 579, 78, 78),
+  lot(57, 1774, 685, 78, 78),
+  lot(58, 1876, 685, 78, 78),
+  lot(59, 794, 836, 78, 78),
+  lot(60, 904, 836, 78, 78),
+  lot(61, 794, 932, 78, 78),
+  lot(62, 904, 932, 78, 78),
+  lot(63, 794, 1026, 78, 78),
+  lot(64, 904, 1026, 78, 78),
+  lot(65, 1016, 1026, 78, 78),
+  lot(66, 794, 1122, 78, 78),
+  lot(67, 904, 1122, 78, 78),
+  lot(68, 1016, 1122, 78, 78),
+  lot(69, 904, 1216, 78, 78),
+  lot(70, 1016, 1216, 78, 78),
+  lot(71, 1327, 836, 78, 78),
+  lot(72, 1437, 836, 78, 78),
+  lot(73, 1549, 836, 78, 78),
+  lot(74, 1659, 836, 78, 78),
+  lot(75, 1327, 932, 78, 78),
+  lot(76, 1437, 932, 78, 78),
+  lot(77, 1549, 932, 78, 78),
+  lot(78, 1659, 932, 78, 78),
+  lot(79, 1327, 1026, 78, 78),
+  lot(80, 1437, 1026, 78, 78),
+  lot(81, 1549, 1026, 78, 78),
+  lot(82, 1659, 1026, 78, 78),
+  lot(83, 1327, 1122, 78, 78),
+  lot(84, 1437, 1122, 78, 78),
+  lot(85, 1549, 1122, 78, 78),
 ];
 
 const handCards = [7, 12, 18];
-const shops = [
-  ["茶馆", "茶", 1],
-  ["药铺", "药", 1],
-  ["饭馆", "饭", 0],
-  ["鱼行", "鱼", 0],
-  ["洗衣", "洗", 0],
-  ["钱庄", "钱", 0],
+const shopCatalog = [
+  { id: "antique", name: "古董店", mark: "古", size: 5, image: "assets/shop-icons/古董店.png" },
+  { id: "photo", name: "照相馆", mark: "照", size: 3, image: "assets/shop-icons/照相馆.png" },
+  { id: "factory", name: "工厂", mark: "工", size: 6, image: "assets/shop-icons/工厂.png" },
+  { id: "clothing", name: "服装店", mark: "服", size: 5, image: "assets/shop-icons/服装店.png" },
+  { id: "laundry", name: "洗衣店", mark: "洗", size: 4, image: "assets/shop-icons/洗衣店.png" },
+  { id: "tea", name: "茶馆", mark: "茶", size: 3, image: "assets/shop-icons/茶馆.png" },
+  { id: "restaurant", name: "饭店", mark: "饭", size: 4, image: "assets/shop-icons/饭店.png" },
+  { id: "pawn", name: "当铺", mark: "当", size: 5, image: "assets/shop-icons/当铺.png" },
+  { id: "florist", name: "花店", mark: "花", size: 4, image: "assets/shop-icons/花店.png" },
+  { id: "dimsum", name: "点心店", mark: "点", size: 3, image: "assets/shop-icons/点心店.png" },
+  { id: "jewelry", name: "珠宝店", mark: "宝", size: 6, image: "assets/shop-icons/珠宝店.png" },
+  { id: "seafood", name: "海鲜店", mark: "鲜", size: 3, image: "assets/shop-icons/海鲜店.png" },
 ];
 
 const board = document.querySelector("#board");
@@ -104,6 +155,7 @@ const roundLabel = document.querySelector("#roundLabel");
 const cashLabel = document.querySelector("#cashLabel");
 const selectedSummary = document.querySelector("#selectedSummary");
 const cardRow = document.querySelector("#cardRow");
+const draftAction = document.querySelector("#draftAction");
 const shopGrid = document.querySelector("#shopGrid");
 const playersList = document.querySelector("#playersList");
 const playerCountLabel = document.querySelector("#playerCountLabel");
@@ -124,6 +176,10 @@ let currentPlayerId = null;
 let lots = [];
 let lotsById = new Map();
 let lotsByPosition = new Map();
+let lotOwners = {};
+let selectedBuildingKeeps = new Set();
+let buildingDraftConfirmed = false;
+let selectedShopCardId = null;
 
 function showScreen(screen) {
   [homeScreen, waitingScreen, starterScreen, moneyScreen, gameScreen].forEach((item) => {
@@ -200,10 +256,15 @@ function makeLocalGame() {
   const rule = rules[room.playerCount];
   return {
     round: 1,
-    phase: "starter",
+    phase: "building-draft",
     buildingCards: Array.from({ length: rule.deal }, (_, index) => index + 1),
+    keptBuildingIds: [],
+    publicLots: [],
+    buildingConfirmed: false,
+    buildingReadyCount: 0,
     buildingKeepCount: rule.keep,
     buildingDealCount: rule.deal,
+    shopCards: [],
     shopTileDrawCount: rule.shops,
     deckRemaining: 85 - rule.deal * room.playerCount,
   };
@@ -214,8 +275,13 @@ function makeDevGame() {
     round: 1,
     phase: "building-draft",
     buildingCards: [7, 12, 18, 24, 31, 43, 51],
+    keptBuildingIds: [],
+    publicLots: [],
+    buildingConfirmed: false,
+    buildingReadyCount: 0,
     buildingKeepCount: 5,
     buildingDealCount: 7,
+    shopCards: [],
     shopTileDrawCount: 6,
     deckRemaining: 64,
   };
@@ -245,18 +311,25 @@ function buildLots() {
 }
 
 function getNeighbors(lot) {
-  const sameLineTolerance = 18;
-  const minStep = 82;
-  const maxHorizontalStep = 128;
-  const maxVerticalStep = 124;
+  const edgeTolerance = 36;
+
+  const overlapLength = (startA, endA, startB, endB) => Math.min(endA, endB) - Math.max(startA, startB);
 
   return lots.filter((candidate) => {
     if (candidate.id === lot.id) return false;
 
-    const dx = Math.abs(candidate.cx - lot.cx);
-    const dy = Math.abs(candidate.cy - lot.cy);
-    const horizontalTouch = dx >= minStep && dx <= maxHorizontalStep && dy <= sameLineTolerance;
-    const verticalTouch = dy >= minStep && dy <= maxVerticalStep && dx <= sameLineTolerance;
+    const horizontalGap = Math.min(
+      Math.abs(candidate.x - (lot.x + lot.w)),
+      Math.abs(lot.x - (candidate.x + candidate.w)),
+    );
+    const verticalGap = Math.min(
+      Math.abs(candidate.y - (lot.y + lot.h)),
+      Math.abs(lot.y - (candidate.y + candidate.h)),
+    );
+    const verticalOverlap = overlapLength(lot.y, lot.y + lot.h, candidate.y, candidate.y + candidate.h);
+    const horizontalOverlap = overlapLength(lot.x, lot.x + lot.w, candidate.x, candidate.x + candidate.w);
+    const horizontalTouch = horizontalGap <= edgeTolerance && verticalOverlap > lot.h * 0.6;
+    const verticalTouch = verticalGap <= edgeTolerance && horizontalOverlap > lot.w * 0.6;
 
     return horizontalTouch || verticalTouch;
   });
@@ -270,17 +343,20 @@ function renderBoard() {
 
   lots.forEach((lot) => {
     const cell = document.createElement("button");
-    const owner = owners[lot.id];
+    const owner = lotOwners[lot.id];
 
     cell.type = "button";
     cell.className = "cell";
     cell.textContent = lot.id;
     cell.dataset.id = String(lot.id);
-    cell.style.setProperty("--x", `${(lot.cx / MAP_WIDTH) * 100}%`);
-    cell.style.setProperty("--y", `${(lot.cy / MAP_HEIGHT) * 100}%`);
+    cell.style.setProperty("--x", `${(lot.x / MAP_WIDTH) * 100}%`);
+    cell.style.setProperty("--y", `${(lot.y / MAP_HEIGHT) * 100}%`);
+    cell.style.setProperty("--w", `${(lot.w / MAP_WIDTH) * 100}%`);
+    cell.style.setProperty("--h", `${(lot.h / MAP_HEIGHT) * 100}%`);
 
     if (owner) {
       cell.classList.add(owner.className);
+      cell.dataset.owner = owner.name;
     }
 
     if (owner?.shop) {
@@ -396,6 +472,8 @@ function showBuildingDraft() {
     currentGame.phase = "building-draft";
   }
 
+  selectedBuildingKeeps = new Set(currentGame?.keptBuildingIds || []);
+  buildingDraftConfirmed = Boolean(currentGame?.buildingConfirmed);
   renderPlayers();
   renderHand();
   renderShops();
@@ -405,23 +483,99 @@ function showBuildingDraft() {
   showScreen(gameScreen);
 }
 
+function activateTab(tabName) {
+  document.querySelectorAll(".tab").forEach((item) => {
+    item.classList.toggle("is-active", item.dataset.tab === tabName);
+  });
+  document.querySelectorAll(".tab-panel").forEach((item) => {
+    item.classList.toggle("is-active", item.id === tabName);
+  });
+}
+
+function locateLot(id) {
+  const target = document.querySelector(`.cell[data-id="${id}"]`);
+  target?.scrollIntoView({ behavior: "smooth", block: "center", inline: "center" });
+  target?.click();
+}
+
+function updateDraftSummary() {
+  if (!currentGame) return;
+
+  if (currentGame.phase === "building-draft") {
+    const readyCount = currentGame.buildingReadyCount || (buildingDraftConfirmed ? 1 : 0);
+    selectedSummary.textContent = buildingDraftConfirmed
+      ? `已确认地块 · 等待 ${readyCount}/${room.playerCount}`
+      : `保留地块 ${selectedBuildingKeeps.size}/${currentGame.buildingKeepCount}`;
+    return;
+  }
+
+  if (currentGame.phase === "building-reveal") {
+    selectedSummary.textContent = "地块公示中 · 即将发放店铺";
+    return;
+  }
+
+  if (currentGame.phase === "shop-draft") {
+    selectedSummary.textContent = `店铺 ${currentGame.shopCards?.length || currentGame.shopTileDrawCount} 张`;
+  }
+}
+
 function renderHand() {
   cardRow.innerHTML = "";
+  draftAction.innerHTML = "";
   const cards = currentGame?.buildingCards || handCards;
   const keepCount = currentGame?.buildingKeepCount;
+  const isDrafting = currentGame?.phase === "building-draft";
+  const isAfterDraft = ["building-reveal", "shop-dealing", "shop-draft"].includes(currentGame?.phase);
+  const keptIds = isAfterDraft
+    ? new Set(currentGame.keptBuildingIds || [...selectedBuildingKeeps])
+    : selectedBuildingKeeps;
+  const visibleCards = isAfterDraft ? [...keptIds].sort((a, b) => a - b) : cards;
 
-  cards.forEach((id) => {
+  visibleCards.forEach((id) => {
     const card = document.createElement("button");
     card.type = "button";
     card.className = "deed-card";
-    card.innerHTML = `<small>${keepCount ? "候选地块" : "地块"}</small><strong>${id}</strong><small>点击定位</small>`;
+    card.classList.toggle("is-kept", keptIds.has(id));
+    card.disabled = buildingDraftConfirmed && isDrafting;
+    card.innerHTML = `
+      <small>${keptIds.has(id) ? "已保留" : "候选地块"}</small>
+      <strong>${id}</strong>
+      <small>${isDrafting ? "点击保留/定位" : "点击定位"}</small>
+    `;
     card.addEventListener("click", () => {
-      const target = document.querySelector(`.cell[data-id="${id}"]`);
-      target?.scrollIntoView({ behavior: "smooth", block: "center", inline: "center" });
-      target?.click();
+      if (isDrafting && !buildingDraftConfirmed) {
+        if (selectedBuildingKeeps.has(id)) {
+          selectedBuildingKeeps.delete(id);
+        } else if (selectedBuildingKeeps.size < keepCount) {
+          selectedBuildingKeeps.add(id);
+        } else {
+          selectedSummary.textContent = `最多保留 ${keepCount} 张地块`;
+        }
+        renderHand();
+        updateDraftSummary();
+      }
+
+      locateLot(id);
     });
     cardRow.appendChild(card);
   });
+
+  if (isDrafting) {
+    const action = document.createElement("button");
+    action.type = "button";
+    action.className = "confirm-draft";
+    action.disabled = buildingDraftConfirmed || selectedBuildingKeeps.size !== keepCount;
+    action.textContent = buildingDraftConfirmed ? "已确认，等待其他玩家" : `确认保留 ${selectedBuildingKeeps.size}/${keepCount}`;
+    action.addEventListener("click", confirmBuildingDraft);
+    draftAction.appendChild(action);
+  } else if (isAfterDraft) {
+    const note = document.createElement("p");
+    note.className = "draft-note";
+    note.textContent = currentGame?.phase === "building-reveal"
+      ? "本轮地块正在公示。"
+      : "未保留的地块已弃回地块堆。";
+    draftAction.appendChild(note);
+  }
 }
 
 function renderShops() {
@@ -430,17 +584,195 @@ function renderShops() {
   if (currentGame?.phase === "building-draft") {
     const chip = document.createElement("div");
     chip.className = "shop-chip wide";
-    chip.innerHTML = `<span>本轮稍后抽取商铺砖</span><strong>x${currentGame.shopTileDrawCount}</strong>`;
+    chip.innerHTML = `<span>本轮稍后抽取店铺</span><strong>x${currentGame.shopTileDrawCount}</strong>`;
     shopGrid.appendChild(chip);
     return;
   }
 
-  shops.forEach(([name, icon, count]) => {
+  if (currentGame?.phase === "building-reveal") {
     const chip = document.createElement("div");
-    chip.className = "shop-chip";
-    chip.innerHTML = `<span>${icon} ${name}</span><strong>x${count}</strong>`;
+    chip.className = "shop-chip wide is-dealing";
+    chip.innerHTML = `<span>地块公示中</span><strong>${currentGame.publicLots?.length || 0} 块</strong>`;
+    shopGrid.appendChild(chip);
+    return;
+  }
+
+  if (currentGame?.phase === "shop-dealing") {
+    const chip = document.createElement("div");
+    chip.className = "shop-chip wide is-dealing";
+    chip.innerHTML = `<span>正在发放店铺</span><strong>x${currentGame.shopTileDrawCount}</strong>`;
+    shopGrid.appendChild(chip);
+    return;
+  }
+
+  const shopCards = currentGame?.shopCards?.length ? currentGame.shopCards : shopCatalog;
+  const groupedShops = [...shopCards.reduce((groups, shop) => {
+    const group = groups.get(shop.id) || { ...shop, count: 0 };
+    group.count += 1;
+    groups.set(shop.id, group);
+    return groups;
+  }, new Map()).values()];
+
+  groupedShops.forEach((shop, index) => {
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.className = "shop-chip shop-card";
+    chip.classList.toggle("is-selected", selectedShopCardId === shop.id);
+    chip.style.animationDelay = `${index * 80}ms`;
+    chip.innerHTML = `
+      <img src="${shop.image}" alt="${shop.name}" loading="lazy" />
+      <strong aria-label="${shop.name} 数量 ${shop.count}">${shop.count}</strong>
+    `;
+    chip.addEventListener("click", () => {
+      const previousSelected = shopGrid.querySelector(".shop-card.is-selected");
+      selectedShopCardId = selectedShopCardId === shop.id ? null : shop.id;
+      selectedSummary.textContent = selectedShopCardId ? `已选店铺：${shop.name} · ${shop.count} 张` : "未选择店铺";
+      previousSelected?.classList.remove("is-selected");
+      chip.classList.toggle("is-selected", selectedShopCardId === shop.id);
+    });
     shopGrid.appendChild(chip);
   });
+}
+
+function makeShopCandidates(count) {
+  return shopCatalog.slice(0, count).map((shop, index) => ({
+    ...shop,
+    cardId: `${shop.id}-local-${index + 1}`,
+  }));
+}
+
+function applyPublicLotsToBoard(publicLots = []) {
+  lotOwners = {};
+  publicLots.forEach((item) => {
+    lotOwners[item.lotId] = {
+      name: item.name,
+      className: ownerClassByColor[item.color] || "owner-red",
+    };
+  });
+  renderBoard();
+}
+
+function showShopDraft({ animate = true } = {}) {
+  if (!currentGame) return;
+
+  if (animate) {
+    currentGame.phase = "shop-dealing";
+    selectedSummary.textContent = "正在发放店铺...";
+    activateTab("shops");
+    renderHand();
+    renderShops();
+
+    window.setTimeout(() => {
+      currentGame.phase = "shop-draft";
+      currentGame.shopCards = currentGame.shopCards?.length
+        ? currentGame.shopCards
+        : makeShopCandidates(currentGame.shopTileDrawCount);
+      selectedShopCardId = null;
+      renderPlayers();
+      renderHand();
+      renderShops();
+      updateDraftSummary();
+    }, 850);
+    return;
+  }
+
+  currentGame.phase = "shop-draft";
+  currentGame.shopCards = currentGame.shopCards?.length
+    ? currentGame.shopCards
+    : makeShopCandidates(currentGame.shopTileDrawCount);
+  activateTab("shops");
+  renderPlayers();
+  renderHand();
+  renderShops();
+  updateDraftSummary();
+}
+
+function finishLocalBuildingDraft(keptIds) {
+  const discarded = currentGame.buildingCards.filter((id) => !keptIds.includes(id));
+  const otherLots = room.players.slice(1).flatMap((player, playerIndex) => (
+    discarded.slice(playerIndex * 2, playerIndex * 2 + 2).map((lotId) => ({
+      lotId,
+      name: player.name,
+      color: player.color,
+    }))
+  ));
+  const selfPlayer = room.players.find((player) => player.id === currentPlayerId || player.you) || room.players[0];
+
+  currentGame.phase = "building-reveal";
+  currentGame.buildingCards = keptIds;
+  currentGame.keptBuildingIds = keptIds;
+  currentGame.publicLots = [
+    ...keptIds.map((lotId) => ({
+      lotId,
+      name: selfPlayer.name,
+      color: selfPlayer.color,
+    })),
+    ...otherLots,
+  ];
+  currentGame.buildingConfirmed = true;
+  currentGame.buildingReadyCount = room.playerCount;
+  currentGame.shopCards = makeShopCandidates(currentGame.shopTileDrawCount);
+
+  room.players.forEach((player) => {
+    player.stats = `${currentGame.buildingKeepCount} 地块 · 0 商铺`;
+  });
+
+  applyPublicLotsToBoard(currentGame.publicLots);
+  renderPlayers();
+  renderHand();
+  renderShops();
+  updateDraftSummary();
+  window.setTimeout(() => showShopDraft({ animate: true }), 1500);
+}
+
+function confirmBuildingDraft() {
+  const keepCount = currentGame?.buildingKeepCount || 0;
+  const keptIds = [...selectedBuildingKeeps].sort((a, b) => a - b);
+
+  if (keptIds.length !== keepCount) {
+    selectedSummary.textContent = `需要保留 ${keepCount} 张地块`;
+    return;
+  }
+
+  buildingDraftConfirmed = true;
+  currentGame.keptBuildingIds = keptIds;
+  currentGame.buildingConfirmed = true;
+  renderHand();
+  updateDraftSummary();
+
+  if (socket && room?.code && currentPlayerId !== "local-host") {
+    socket.emit("confirmBuildingDraft", { code: room.code, kept: keptIds }, (reply) => {
+      if (!reply?.ok) {
+        buildingDraftConfirmed = false;
+        selectedSummary.textContent = reply?.error || "确认地块失败。";
+        renderHand();
+        return;
+      }
+
+      room = reply.room;
+      currentGame = reply.game;
+      selectedBuildingKeeps = new Set(currentGame.keptBuildingIds || keptIds);
+      buildingDraftConfirmed = Boolean(currentGame.buildingConfirmed);
+      if (currentGame.phase === "building-reveal") {
+        applyPublicLotsToBoard(currentGame.publicLots || []);
+        renderPlayers();
+        renderHand();
+        renderShops();
+        updateDraftSummary();
+        return;
+      }
+      if (currentGame.phase === "shop-draft") {
+        applyPublicLotsToBoard(currentGame.publicLots || []);
+        showShopDraft({ animate: true });
+        return;
+      }
+      updateDraftSummary();
+      renderHand();
+    });
+    return;
+  }
+
+  finishLocalBuildingDraft(keptIds);
 }
 
 function selectCell(id, element) {
@@ -453,7 +785,7 @@ function selectCell(id, element) {
   selectedCell = element;
   selectedCell.classList.add("is-selected");
 
-  const owner = owners[id];
+  const owner = lotOwners[id];
   const lot = lotsById.get(id);
   const neighborIds = getNeighbors(lot).map((neighbor) => neighbor.id).join("、") || "无";
   const ownerText = owner ? `${owner.name}${owner.shop ? ` · ${owner.shop}` : ""}` : "无主";
@@ -468,10 +800,7 @@ function clearSelection() {
 
 document.querySelectorAll(".tab").forEach((tab) => {
   tab.addEventListener("click", () => {
-    document.querySelectorAll(".tab").forEach((item) => item.classList.remove("is-active"));
-    document.querySelectorAll(".tab-panel").forEach((item) => item.classList.remove("is-active"));
-    tab.classList.add("is-active");
-    document.querySelector(`#${tab.dataset.tab}`).classList.add("is-active");
+    activateTab(tab.dataset.tab);
   });
 });
 
@@ -621,6 +950,34 @@ if (socket) {
     currentGame = payload.game;
     renderStarterWheel();
     showScreen(starterScreen);
+  });
+
+  socket.on("gameState", (payload) => {
+    const previousPhase = currentGame?.phase;
+    room = payload.room;
+    currentGame = payload.game;
+    selectedBuildingKeeps = new Set(currentGame.keptBuildingIds || []);
+    buildingDraftConfirmed = Boolean(currentGame.buildingConfirmed);
+
+    if (currentGame.phase === "building-reveal") {
+      applyPublicLotsToBoard(currentGame.publicLots || []);
+      renderPlayers();
+      renderHand();
+      renderShops();
+      updateDraftSummary();
+      return;
+    }
+
+    if (!["shop-draft", "shop-dealing"].includes(previousPhase) && currentGame.phase === "shop-draft") {
+      applyPublicLotsToBoard(currentGame.publicLots || []);
+      showShopDraft({ animate: true });
+      return;
+    }
+
+    renderPlayers();
+    renderHand();
+    renderShops();
+    updateDraftSummary();
   });
 }
 

@@ -36,6 +36,21 @@ const SHOP_TILE_RULES = {
   4: [4, 3, 3, 3, 3, 3],
 };
 
+const SHOP_TYPES = [
+  { id: "antique", name: "古董店", mark: "古", size: 5, image: "assets/shop-icons/古董店.png" },
+  { id: "photo", name: "照相馆", mark: "照", size: 3, image: "assets/shop-icons/照相馆.png" },
+  { id: "factory", name: "工厂", mark: "工", size: 6, image: "assets/shop-icons/工厂.png" },
+  { id: "clothing", name: "服装店", mark: "服", size: 5, image: "assets/shop-icons/服装店.png" },
+  { id: "laundry", name: "洗衣店", mark: "洗", size: 4, image: "assets/shop-icons/洗衣店.png" },
+  { id: "tea", name: "茶馆", mark: "茶", size: 3, image: "assets/shop-icons/茶馆.png" },
+  { id: "restaurant", name: "饭店", mark: "饭", size: 4, image: "assets/shop-icons/饭店.png" },
+  { id: "pawn", name: "当铺", mark: "当", size: 5, image: "assets/shop-icons/当铺.png" },
+  { id: "florist", name: "花店", mark: "花", size: 4, image: "assets/shop-icons/花店.png" },
+  { id: "dimsum", name: "点心店", mark: "点", size: 3, image: "assets/shop-icons/点心店.png" },
+  { id: "jewelry", name: "珠宝店", mark: "宝", size: 6, image: "assets/shop-icons/珠宝店.png" },
+  { id: "seafood", name: "海鲜店", mark: "鲜", size: 3, image: "assets/shop-icons/海鲜店.png" },
+];
+
 app.use(express.static(__dirname));
 
 function getLanUrls() {
@@ -89,6 +104,25 @@ function shuffle(items) {
   return result;
 }
 
+function createShopDeck() {
+  return shuffle(SHOP_TYPES.flatMap((shop) => (
+    Array.from({ length: shop.size + 3 }, (_, index) => ({ ...shop, cardId: `${shop.id}-${index + 1}` }))
+  )));
+}
+
+function publicBuildingLots(room) {
+  if (!room.game) return [];
+
+  return room.players.flatMap((player) => (
+    (room.game.buildingSelections[player.id] || []).map((lotId) => ({
+      lotId,
+      playerId: player.id,
+      name: player.name,
+      color: player.color,
+    }))
+  ));
+}
+
 function createGame(room) {
   const buildingDeck = shuffle(Array.from({ length: 85 }, (_, index) => index + 1));
   const businessOutlookDeck = shuffle([
@@ -111,10 +145,13 @@ function createGame(room) {
 
   return {
     round: 1,
-    phase: "starter",
+    phase: "building-draft",
     buildingDeck,
+    shopDeck: createShopDeck(),
     businessOutlookDeck,
     buildingDrafts,
+    buildingSelections: {},
+    shopDrafts: {},
     buildingKeepCount: buildingRule.keep,
     buildingDealCount: buildingRule.deal,
     shopTileDrawCount: SHOP_TILE_RULES[room.playerCount][0],
@@ -127,9 +164,14 @@ function personalGameState(room, playerId) {
   return {
     round: room.game.round,
     phase: room.game.phase,
-    buildingCards: room.game.buildingDrafts[playerId] || [],
+    buildingCards: room.game.buildingSelections[playerId] || room.game.buildingDrafts[playerId] || [],
+    keptBuildingIds: room.game.buildingSelections[playerId] || [],
+    buildingConfirmed: Boolean(room.game.buildingSelections[playerId]),
+    buildingReadyCount: Object.keys(room.game.buildingSelections).length,
     buildingKeepCount: room.game.buildingKeepCount,
     buildingDealCount: room.game.buildingDealCount,
+    publicLots: publicBuildingLots(room),
+    shopCards: room.game.shopDrafts[playerId] || [],
     shopTileDrawCount: room.game.shopTileDrawCount,
     deckRemaining: room.game.buildingDeck.length,
   };
@@ -138,6 +180,15 @@ function personalGameState(room, playerId) {
 function emitGameStarted(room) {
   room.players.forEach((player) => {
     io.to(player.id).emit("gameStarted", {
+      room: publicRoom(room),
+      game: personalGameState(room, player.id),
+    });
+  });
+}
+
+function emitGameState(room) {
+  room.players.forEach((player) => {
+    io.to(player.id).emit("gameState", {
       room: publicRoom(room),
       game: personalGameState(room, player.id),
     });
@@ -264,6 +315,58 @@ io.on("connection", (socket) => {
     room.game = createGame(room);
     reply?.({ ok: true, room: publicRoom(room), game: personalGameState(room, socket.id) });
     emitGameStarted(room);
+  });
+
+  socket.on("confirmBuildingDraft", ({ code, kept }, reply) => {
+    const room = rooms.get(String(code || "").trim().toUpperCase());
+
+    if (!room || !room.game) {
+      reply?.({ ok: false, error: "房间不存在。" });
+      return;
+    }
+
+    if (room.game.phase !== "building-draft") {
+      reply?.({ ok: false, error: "现在不能确认地块。" });
+      return;
+    }
+
+    const draft = room.game.buildingDrafts[socket.id] || [];
+    const selected = [...new Set((kept || []).map(Number))]
+      .filter((id) => draft.includes(id))
+      .sort((a, b) => a - b);
+
+    if (selected.length !== room.game.buildingKeepCount) {
+      reply?.({ ok: false, error: `需要保留 ${room.game.buildingKeepCount} 张地块。` });
+      return;
+    }
+
+    room.game.buildingSelections[socket.id] = selected;
+
+    const player = room.players.find((item) => item.id === socket.id);
+    if (player) {
+      player.stats = `${selected.length} 地块 · 0 商铺`;
+    }
+
+    const allReady = room.players.every((item) => room.game.buildingSelections[item.id]);
+
+    if (allReady) {
+      room.game.phase = "building-reveal";
+    }
+
+    reply?.({ ok: true, room: publicRoom(room), game: personalGameState(room, socket.id) });
+    emitGameState(room);
+
+    if (allReady) {
+      setTimeout(() => {
+        if (!rooms.has(room.code) || room.game?.phase !== "building-reveal") return;
+
+        room.game.phase = "shop-draft";
+        room.players.forEach((item) => {
+          room.game.shopDrafts[item.id] = room.game.shopDeck.splice(0, room.game.shopTileDrawCount);
+        });
+        emitGameState(room);
+      }, 1800);
+    }
   });
 
   socket.on("disconnect", () => {
