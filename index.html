@@ -11,7 +11,7 @@
     <title>霓虹唐埠 - 手机原型 P0</title>
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="icon" href="/assets/app-icon.svg" />
-    <link rel="stylesheet" href="styles.css?v=shop-stack-3" />
+    <link rel="stylesheet" href="styles.css?v=shop-place-8" />
   </head>
   <body>
     <main class="entry-shell screen is-active" id="homeScreen">
@@ -182,7 +182,21 @@
       </section>
     </div>
 
+    <div class="modal-backdrop trade-backdrop" id="tradeModal" aria-hidden="true">
+      <section class="hint-modal trade-modal" role="dialog" aria-modal="true" aria-labelledby="tradeTitle">
+        <div class="hint-head">
+          <div>
+            <span class="label">自由交易</span>
+            <h2 id="tradeTitle">发起交易</h2>
+          </div>
+          <button id="closeTrade" type="button">关闭</button>
+        </div>
+        <div class="trade-body" id="tradeBody"></div>
+        <button class="confirm-draft trade-submit" id="submitTrade" type="button">生成交易提议</button>
+      </section>
+    </div>
+
     <script src="/socket.io/socket.io.js"></script>
-    <script src="app.js?v=shop-stack-3"></script>
+    <script src="app.js?v=shop-place-8"></script>
   </body>
 </html>

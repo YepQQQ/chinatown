@@ -224,49 +224,97 @@ input {
 
 .starter-wheel {
   position: relative;
-  display: grid;
-  place-items: center;
-  width: min(72vw, 260px);
+  --label-radius: min(36vw, 152px);
+  --ring-bg: conic-gradient(rgba(214, 167, 58, 0.78), rgba(16, 201, 193, 0.72));
+  width: min(84vw, 352px);
   aspect-ratio: 1;
-  margin: 10px auto 16px;
-  border: 2px solid rgba(214, 167, 58, 0.5);
+  margin: 8px auto 14px;
+  border-radius: 50%;
+}
+
+.starter-player-ring {
+  position: absolute;
+  inset: 0;
+  border: 2px solid rgba(255, 232, 160, 0.88);
   border-radius: 50%;
   background:
-    conic-gradient(from 0deg, rgba(217, 74, 55, 0.72), rgba(16, 201, 193, 0.72), rgba(214, 167, 58, 0.78), rgba(88, 192, 109, 0.72), rgba(217, 74, 55, 0.72)),
-    rgba(0, 0, 0, 0.2);
-  box-shadow: 0 0 40px rgba(214, 167, 58, 0.18);
+    radial-gradient(circle at 50% 50%, transparent 0 52%, rgba(255, 235, 171, 0.24) 53% 54%, rgba(42, 24, 8, 0.76) 55% 58%, transparent 59%),
+    var(--ring-bg);
+  box-shadow:
+    0 0 0 5px rgba(88, 49, 15, 0.92),
+    0 0 0 10px rgba(255, 220, 132, 0.16),
+    0 0 0 7px rgba(0, 0, 0, 0.26) inset,
+    0 0 0 22px rgba(42, 24, 8, 0.6) inset,
+    0 20px 54px rgba(0, 0, 0, 0.42);
+  -webkit-mask: radial-gradient(circle, transparent 0 52%, #000 53%);
+  mask: radial-gradient(circle, transparent 0 52%, #000 53%);
+}
+
+.starter-wheel-core {
+  position: absolute;
+  inset: 19%;
+  border-radius: 50%;
+  background: transparent url("assets/spinner-wheel.png?v=1") center / contain no-repeat;
+  filter: drop-shadow(0 16px 32px rgba(0, 0, 0, 0.44));
 }
 
 .starter-wheel::before {
   content: "";
   position: absolute;
-  inset: 18%;
+  inset: 13%;
+  z-index: 1;
+  border: 2px solid rgba(255, 224, 146, 0.62);
   border-radius: 50%;
-  background: rgba(15, 10, 5, 0.9);
+  box-shadow:
+    0 0 0 5px rgba(20, 12, 4, 0.52),
+    0 0 22px rgba(214, 167, 58, 0.18);
+  pointer-events: none;
 }
 
 .starter-wheel::after {
-  content: "";
-  position: absolute;
-  top: -11px;
-  width: 0;
-  height: 0;
-  border-right: 10px solid transparent;
-  border-left: 10px solid transparent;
-  border-bottom: 20px solid var(--gold);
+  content: none;
 }
 
-.starter-wheel.is-spinning {
+.starter-wheel.is-spinning .starter-wheel-core {
   animation: spinWheel 1.8s cubic-bezier(0.16, 0.78, 0.22, 1) both;
 }
 
 .starter-name {
-  z-index: 1;
-  padding: 10px 14px;
-  border: 1px solid rgba(214, 167, 58, 0.42);
-  border-radius: 999px;
-  background: rgba(0, 0, 0, 0.34);
-  font-size: 24px;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 3;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: #fff7dd;
+  font: 900 16px/1 "PingFang SC", sans-serif;
+  text-align: center;
+  text-shadow:
+    0 2px 5px rgba(0, 0, 0, 0.75),
+    0 0 12px rgba(0, 0, 0, 0.5);
+  transform:
+    translate(-50%, -50%)
+    rotate(var(--label-angle))
+    translateY(calc(-1 * var(--label-radius)));
+}
+
+.starter-name.red {
+  box-shadow: none;
+}
+
+.starter-name.cyan {
+  box-shadow: none;
+}
+
+.starter-name.gold {
+  box-shadow: none;
+}
+
+.starter-name.green {
+  box-shadow: none;
 }
 
 .starter-result {
@@ -324,11 +372,11 @@ input {
   }
 
   75% {
-    transform: rotate(980deg) scale(1.02);
+    transform: rotate(calc(900deg + var(--starter-angle, 0deg))) scale(1.02);
   }
 
   100% {
-    transform: rotate(1080deg) scale(1);
+    transform: rotate(calc(1080deg + var(--starter-angle, 0deg))) scale(1);
   }
 }
 
@@ -548,7 +596,7 @@ input {
   aspect-ratio: 2028 / 1404;
   border-radius: 10px;
   overflow: hidden;
-  background: #120b05 url("assets/map.png?v=shop-stack-3") center / 100% 100% no-repeat;
+  background: #120b05 url("assets/map.png?v=shop-place-8") center / 100% 100% no-repeat;
 }
 
 .cell {
@@ -560,52 +608,241 @@ input {
   height: var(--h);
   left: var(--x);
   top: var(--y);
-  border: 1px solid transparent;
-  border-radius: 4px;
+  border: 2px solid transparent;
+  border-radius: 8px;
   color: transparent;
   background: rgba(16, 201, 193, 0.01);
-  font-family: "Courier New", monospace;
+  font-family: "Times New Roman", "PingFang SC", serif;
   font-size: 0;
+  line-height: 1;
+}
+
+.board.is-placing-shop .cell {
+  transition: background 140ms ease, box-shadow 140ms ease, opacity 140ms ease;
+}
+
+.board.is-placing-shop .cell.placement-muted {
+  opacity: 0.22;
+  background: rgba(0, 0, 0, 0.28);
+  box-shadow: inset 0 0 0 1px rgba(70, 58, 44, 0.28);
+}
+
+.board.is-placing-shop .cell.placement-muted::after {
+  opacity: 0;
+}
+
+.board.is-placing-shop .cell.placement-muted .shop-bridge {
+  opacity: 0;
+}
+
+.board.is-placing-shop .cell.placement-blocked {
+  background: rgba(20, 12, 5, 0.18);
 }
 
 .cell.owner-red {
-  box-shadow: inset 0 0 0 2px rgba(217, 74, 55, 0.72), 0 0 14px rgba(217, 74, 55, 0.2);
+  background: rgba(217, 74, 55, 0.2);
+  border-color: rgba(217, 74, 55, 0.92);
+  color: transparent;
+  box-shadow: 0 0 14px rgba(217, 74, 55, 0.2);
+  font-size: 0;
 }
 
 .cell.owner-cyan {
-  box-shadow: inset 0 0 0 2px rgba(16, 201, 193, 0.72), 0 0 14px rgba(16, 201, 193, 0.2);
+  background: rgba(16, 201, 193, 0.2);
+  border-color: rgba(16, 201, 193, 0.92);
+  color: transparent;
+  box-shadow: 0 0 14px rgba(16, 201, 193, 0.2);
+  font-size: 0;
 }
 
 .cell.owner-gold {
-  box-shadow: inset 0 0 0 2px rgba(214, 167, 58, 0.82), 0 0 14px rgba(214, 167, 58, 0.24);
+  background: rgba(214, 167, 58, 0.2);
+  border-color: rgba(214, 167, 58, 0.94);
+  color: transparent;
+  box-shadow: 0 0 14px rgba(214, 167, 58, 0.24);
+  font-size: 0;
 }
 
 .cell.owner-green {
-  box-shadow: inset 0 0 0 2px rgba(88, 192, 109, 0.82), 0 0 14px rgba(88, 192, 109, 0.24);
+  background: rgba(88, 192, 109, 0.2);
+  border-color: rgba(88, 192, 109, 0.92);
+  color: transparent;
+  box-shadow: 0 0 14px rgba(88, 192, 109, 0.24);
+  font-size: 0;
 }
 
-.cell.has-shop::after {
-  content: attr(data-shop);
+.shop-label {
   position: absolute;
-  right: 3px;
-  bottom: 2px;
-  font-size: 13px;
+  z-index: 5;
+  left: 50%;
+  top: 50%;
+  display: grid;
+  place-items: center;
+  gap: 0;
+  min-width: 24px;
+  max-width: 30px;
+  padding: 3px 4px 2px;
+  border: 1px solid color-mix(in srgb, var(--chain-stroke, rgba(217, 74, 55, 0.88)) 78%, #5a2d0c);
+  border-radius: 7px;
+  color: var(--chain-text, #7b241c);
+  background:
+    linear-gradient(180deg, rgba(255, 246, 205, 0.9), rgba(238, 203, 124, 0.78));
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.24),
+    inset 0 0 0 1px rgba(255, 255, 238, 0.22);
+  text-shadow: 0 1px 1px rgba(255, 250, 219, 0.46);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.shop-label span,
+.shop-label b {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.shop-label span {
+  font: 900 clamp(10px, 0.94vw, 16px)/0.95 "STKaiti", "KaiTi", "PingFang SC", serif;
+}
+
+.shop-label b {
+  font: 900 clamp(7px, 0.64vw, 10px)/1 "Courier New", monospace;
+}
+
+.cell.shop-group {
+  --chain-fill: rgba(217, 74, 55, 0.21);
+  --chain-stroke: rgba(217, 74, 55, 0.6);
+  --chain-glow: rgba(217, 74, 55, 0.12);
+  --chain-text: #7b241c;
+  border-color: var(--chain-stroke);
+  border-radius: 7px;
+  background: var(--chain-fill);
+  color: transparent;
+  box-shadow:
+    0 0 0 1px rgba(255, 240, 184, 0.1) inset,
+    0 0 6px var(--chain-glow);
+}
+
+.cell.shop-group.owner-red {
+  --chain-fill: rgba(217, 74, 55, 0.21);
+  --chain-stroke: rgba(217, 74, 55, 0.62);
+  --chain-glow: rgba(217, 74, 55, 0.12);
+  --chain-text: #7b241c;
+}
+
+.cell.shop-group.owner-cyan {
+  --chain-fill: rgba(16, 201, 193, 0.21);
+  --chain-stroke: rgba(16, 201, 193, 0.6);
+  --chain-glow: rgba(16, 201, 193, 0.12);
+  --chain-text: #075f60;
+}
+
+.cell.shop-group.owner-gold {
+  --chain-fill: rgba(214, 167, 58, 0.22);
+  --chain-stroke: rgba(214, 167, 58, 0.62);
+  --chain-glow: rgba(214, 167, 58, 0.12);
+  --chain-text: #765212;
+}
+
+.cell.shop-group.owner-green {
+  --chain-fill: rgba(88, 192, 109, 0.21);
+  --chain-stroke: rgba(88, 192, 109, 0.62);
+  --chain-glow: rgba(88, 192, 109, 0.12);
+  --chain-text: #276238;
+}
+
+.cell.shop-linked-right {
+  border-right-color: transparent;
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.cell.shop-linked-left {
+  border-left-color: transparent;
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+}
+
+.cell.shop-linked-up {
+  border-top-color: transparent;
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+}
+
+.cell.shop-linked-down {
+  border-bottom-color: transparent;
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.shop-bridge {
+  position: absolute;
+  z-index: 3;
+  display: block;
+  background: var(--chain-fill);
+  pointer-events: none;
+}
+
+.shop-bridge.right,
+.shop-bridge.left {
+  top: 3px;
+  width: 50%;
+  height: calc(100% - 6px);
+  border-top: 1px solid var(--chain-stroke);
+  border-bottom: 1px solid var(--chain-stroke);
+}
+
+.shop-bridge.right {
+  right: -50%;
+}
+
+.shop-bridge.left {
+  left: -50%;
+}
+
+.shop-bridge.up,
+.shop-bridge.down {
+  left: 3px;
+  width: calc(100% - 6px);
+  height: 50%;
+  border-right: 1px solid var(--chain-stroke);
+  border-left: 1px solid var(--chain-stroke);
+}
+
+.shop-bridge.up {
+  top: -50%;
+}
+
+.shop-bridge.down {
+  bottom: -50%;
+}
+
+.cell.can-place-shop {
+  background: rgba(217, 74, 55, 0.14);
+  border-color: rgba(217, 74, 55, 0.92);
+  box-shadow: 0 0 16px rgba(217, 74, 55, 0.32);
 }
 
 .cell.is-selected {
-  background: transparent;
+  background: rgba(43, 86, 255, 0.2);
+  border-color: rgba(7, 31, 202, 0.9);
+  border-radius: 9px;
+  color: transparent;
+  font-size: 0;
   outline: none;
-  box-shadow: none;
+  box-shadow: 0 0 16px rgba(7, 31, 202, 0.28);
+}
+
+.cell.is-selected:not([data-owner]) {
+  border-radius: 50%;
 }
 
 .cell.is-selected::before {
-  content: "";
-  position: absolute;
-  inset: 3px;
-  border: 2px solid var(--gold);
-  border-radius: 6px;
-  background: rgba(214, 167, 58, 0.16);
-  box-shadow: 0 0 16px rgba(214, 167, 58, 0.72);
+  content: none;
 }
 
 .coord-mode .cell,
@@ -633,9 +870,26 @@ input {
   transform: translate(-50%, -50%);
 }
 
+.coord-mode .cell.is-selected::before {
+  inset: 4px;
+  left: 4px;
+  top: 4px;
+  width: auto;
+  height: auto;
+  border: 2px solid rgba(43, 86, 255, 0.98);
+  border-radius: 50%;
+  background: rgba(43, 86, 255, 0.1);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.22),
+    0 0 16px rgba(43, 86, 255, 0.5);
+  transform: none;
+}
+
 .coord-mode .cell::after,
-.coord-mode .cell.has-shop::after {
+.coord-mode .cell.has-shop::after,
+.coord-mode .shop-label {
   content: none;
+  display: none;
 }
 
 .bottom-drawer {
@@ -804,6 +1058,213 @@ input {
   margin: 0;
   color: var(--muted);
   font: 12px/1.4 "PingFang SC", sans-serif;
+}
+
+.hint-modal.trade-modal {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  width: min(820px, calc(100vw - 16px));
+  max-height: calc(100svh - 16px);
+  padding: 12px;
+}
+
+.trade-body {
+  display: grid;
+  gap: 10px;
+  min-height: 0;
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.trade-targets {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.trade-targets button,
+.trade-chip {
+  min-height: 34px;
+  border: 1px solid rgba(214, 167, 58, 0.28);
+  border-radius: 7px;
+  background: rgba(214, 167, 58, 0.08);
+  color: var(--paper);
+  font: 700 12px/1 "PingFang SC", sans-serif;
+}
+
+.trade-targets button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.trade-targets .is-selected,
+.trade-chip.is-selected {
+  border-color: rgba(16, 201, 193, 0.72);
+  background: rgba(16, 201, 193, 0.16);
+  color: #d8fffb;
+}
+
+.trade-columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.trade-columns section {
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid rgba(214, 167, 58, 0.24);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.18);
+}
+
+.trade-columns h3,
+.trade-columns h4 {
+  margin: 0 0 8px;
+  color: var(--paper);
+  font-family: "PingFang SC", sans-serif;
+}
+
+.trade-columns h3 {
+  font-size: 14px;
+}
+
+.trade-columns h4 {
+  margin-top: 10px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.trade-columns label {
+  display: grid;
+  gap: 5px;
+  color: var(--muted);
+  font: 11px/1 "PingFang SC", sans-serif;
+}
+
+.trade-cash span {
+  display: flex;
+  justify-content: space-between;
+}
+
+.trade-cash b {
+  color: #c8fffb;
+}
+
+.trade-columns input {
+  min-height: 34px;
+  font-size: 13px;
+}
+
+.trade-columns input[type="range"] {
+  min-height: 34px;
+  accent-color: var(--cyan);
+  touch-action: pan-x;
+}
+
+.trade-chip-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.trade-shop-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.trade-shop {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.trade-shop > button:first-child {
+  position: relative;
+  display: block;
+  width: 100%;
+  padding: 3px;
+  border: 1px solid rgba(214, 167, 58, 0.28);
+  border-radius: 6px;
+  background: rgba(214, 167, 58, 0.08);
+}
+
+.trade-shop.is-selected > button:first-child {
+  border-color: rgba(16, 201, 193, 0.72);
+  background: rgba(16, 201, 193, 0.14);
+}
+
+.trade-shop img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 4px;
+  object-fit: contain;
+}
+
+.trade-shop strong,
+.trade-shop em {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border-radius: 999px;
+  font: 800 10px/1 "PingFang SC", sans-serif;
+}
+
+.trade-shop strong {
+  top: 4px;
+  right: 4px;
+  border: 1px solid rgba(255, 235, 165, 0.72);
+  color: #fff4c5;
+  background: rgba(30, 18, 6, 0.88);
+}
+
+.trade-shop em {
+  left: 4px;
+  bottom: 4px;
+  border: 1px solid rgba(16, 201, 193, 0.72);
+  color: #d8fffb;
+  background: rgba(4, 56, 58, 0.86);
+  font-style: normal;
+}
+
+.trade-stepper {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) 22px;
+  align-items: center;
+  gap: 3px;
+}
+
+.trade-stepper button {
+  height: 22px;
+  border: 1px solid rgba(214, 167, 58, 0.28);
+  border-radius: 6px;
+  background: rgba(214, 167, 58, 0.1);
+  color: var(--paper);
+}
+
+.trade-stepper b {
+  color: var(--paper);
+  text-align: center;
+  font: 800 11px/1 "PingFang SC", sans-serif;
+}
+
+.trade-empty {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--muted);
+  font: 12px/1.4 "PingFang SC", sans-serif;
+}
+
+.trade-submit {
+  width: 100%;
+  margin-top: 12px;
 }
 
 @keyframes dealIn {
@@ -1544,6 +2005,28 @@ input {
   .game-active .hint-modal {
     width: min(520px, calc(100svh - 24px));
     max-height: calc(100vw - 24px);
+    overflow: auto;
+  }
+
+  .game-active .hint-modal.trade-modal {
+    width: min(820px, calc(100svh - 16px));
+    max-height: calc(100vw - 16px);
+  }
+}
+
+@media (orientation: landscape) {
+  .game-active .trade-backdrop {
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100svh;
+    padding: 8px;
+    transform: none;
+  }
+
+  .game-active .hint-modal.trade-modal {
+    width: min(820px, calc(100vw - 16px));
+    max-height: calc(100svh - 16px);
     overflow: auto;
   }
 }

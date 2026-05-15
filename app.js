@@ -12,6 +12,13 @@ const playerPresets = [
   { name: "阿青", color: "green", stats: "0 地块 · 0 商铺" },
 ];
 
+const playerRingColors = {
+  red: "rgba(217, 74, 55, 0.82)",
+  cyan: "rgba(16, 201, 193, 0.72)",
+  gold: "rgba(214, 167, 58, 0.78)",
+  green: "rgba(88, 192, 109, 0.72)",
+};
+
 const MAP_WIDTH = 2028;
 const MAP_HEIGHT = 1404;
 
@@ -164,6 +171,9 @@ const playersModal = document.querySelector("#playersModal");
 const playersTitle = document.querySelector("#playersTitle");
 const playerModalList = document.querySelector("#playerModalList");
 const hintModal = document.querySelector("#hintModal");
+const tradeModal = document.querySelector("#tradeModal");
+const tradeBody = document.querySelector("#tradeBody");
+const submitTrade = document.querySelector("#submitTrade");
 const socket = typeof io === "function" ? io() : null;
 const params = new URLSearchParams(window.location.search);
 const isDevMode = params.get("dev") === "1";
@@ -180,6 +190,7 @@ let lotOwners = {};
 let selectedBuildingKeeps = new Set();
 let buildingDraftConfirmed = false;
 let selectedShopCardId = null;
+let tradeDraft = makeEmptyTradeDraft();
 
 function showScreen(screen) {
   [homeScreen, waitingScreen, starterScreen, moneyScreen, gameScreen].forEach((item) => {
@@ -233,6 +244,7 @@ function makeRoom(playerCount, code = makeRoomCode()) {
   const hostName = nicknameInput.value.trim() || "你";
   const players = playerPresets.slice(0, playerCount).map((player, index) => ({
     ...player,
+    id: index === 0 ? "local-host" : `local-player-${index}`,
     name: index === 0 ? hostName : player.name,
     ready: true,
   }));
@@ -245,6 +257,18 @@ function makeRoom(playerCount, code = makeRoomCode()) {
     starterId: null,
     players,
     hostName,
+  };
+}
+
+function makeEmptyTradeDraft() {
+  return {
+    targetId: null,
+    offerLots: new Set(),
+    requestLots: new Set(),
+    offerShops: new Map(),
+    requestShops: new Map(),
+    offerCash: 0,
+    requestCash: 0,
   };
 }
 
@@ -265,6 +289,7 @@ function makeLocalGame() {
     buildingKeepCount: rule.keep,
     buildingDealCount: rule.deal,
     shopCards: [],
+    placedShops: {},
     shopTileDrawCount: rule.shops,
     deckRemaining: 85 - rule.deal * room.playerCount,
   };
@@ -274,7 +299,7 @@ function makeDevGame() {
   return {
     round: 1,
     phase: "building-draft",
-    buildingCards: [7, 12, 18, 24, 31, 43, 51],
+    buildingCards: [6, 7, 8, 10, 11, 12, 13],
     keptBuildingIds: [],
     publicLots: [],
     buildingConfirmed: false,
@@ -282,6 +307,7 @@ function makeDevGame() {
     buildingKeepCount: 5,
     buildingDealCount: 7,
     shopCards: [],
+    placedShops: {},
     shopTileDrawCount: 6,
     deckRemaining: 64,
   };
@@ -340,10 +366,14 @@ function renderBoard() {
   lots = buildLots();
   lotsById = new Map(lots.map((lot) => [lot.id, lot]));
   lotsByPosition = new Map(lots.map((lot) => [`${lot.x},${lot.y}`, lot]));
+  const canPreviewPlacement = currentGame?.phase === "shop-draft" && selectedShopCardId;
+  const selfPlayer = getSelfPlayer();
+  board.classList.toggle("is-placing-shop", Boolean(canPreviewPlacement));
 
   lots.forEach((lot) => {
     const cell = document.createElement("button");
     const owner = lotOwners[lot.id];
+    const placedShop = currentGame?.placedShops?.[lot.id];
 
     cell.type = "button";
     cell.className = "cell";
@@ -359,14 +389,120 @@ function renderBoard() {
       cell.dataset.owner = owner.name;
     }
 
-    if (owner?.shop) {
-      cell.classList.add("has-shop");
-      cell.dataset.shop = owner.shop;
+    if (placedShop) {
+      cell.classList.add("shop-group");
+      const componentIds = getShopComponentIds(lot.id);
+      const anchorId = getShopGroupAnchorId(componentIds);
+      const isGroupAnchor = anchorId === lot.id;
+      const linkedDirections = getShopNeighborLinks(lot.id);
+      cell.classList.toggle("shop-group-anchor", isGroupAnchor);
+      cell.classList.toggle("shop-chain", componentIds.length > 1);
+      linkedDirections.forEach((direction) => {
+        cell.classList.add(`shop-linked-${direction}`);
+      });
+      if (isGroupAnchor) {
+        cell.classList.add("has-shop");
+        const label = document.createElement("span");
+        label.className = "shop-label";
+        const shopMark = placedShop.mark || placedShop.name.slice(0, 1);
+        label.innerHTML = componentIds.length > 1
+          ? `<span>${shopMark}</span><b>${componentIds.length}/${placedShop.size}</b>`
+          : `<span>${shopMark}</span>`;
+        cell.appendChild(label);
+      }
+      linkedDirections.forEach((direction) => {
+        const bridge = document.createElement("span");
+        bridge.className = `shop-bridge ${direction}`;
+        bridge.setAttribute("aria-hidden", "true");
+        cell.appendChild(bridge);
+      });
+    }
+
+    if (canPreviewPlacement) {
+      const placement = canPlaceShopOnLot(lot.id);
+      if (placement.ok) {
+        cell.classList.add("can-place-shop");
+      } else if (owner && !ownsLot(selfPlayer, owner)) {
+        cell.classList.add("placement-muted");
+      } else if (owner?.shop) {
+        cell.classList.add("placement-blocked");
+      }
     }
 
     cell.addEventListener("click", () => selectCell(lot.id, cell));
     board.appendChild(cell);
   });
+}
+
+function getShopGroupAnchorId(componentIds) {
+  if (!componentIds.length) return null;
+
+  const componentLots = componentIds.map((id) => lotsById.get(id)).filter(Boolean);
+  const center = componentLots.reduce((sum, lot) => ({
+    x: sum.x + lot.cx / componentLots.length,
+    y: sum.y + lot.cy / componentLots.length,
+  }), { x: 0, y: 0 });
+
+  return componentLots.reduce((bestLot, lot) => {
+    const bestDistance = Math.hypot(bestLot.cx - center.x, bestLot.cy - center.y);
+    const distance = Math.hypot(lot.cx - center.x, lot.cy - center.y);
+    return distance < bestDistance ? lot : bestLot;
+  }, componentLots[0]).id;
+}
+
+function getShopComponentIds(lotId) {
+  const placedShop = currentGame?.placedShops?.[lotId];
+  if (!placedShop) return [];
+
+  const visited = new Set();
+  const queue = [Number(lotId)];
+
+  while (queue.length) {
+    const nextId = queue.shift();
+    if (visited.has(nextId)) continue;
+    const nextShop = currentGame.placedShops?.[nextId];
+    if (!nextShop || nextShop.id !== placedShop.id || nextShop.ownerId !== placedShop.ownerId) continue;
+
+    visited.add(nextId);
+    const lot = lotsById.get(nextId);
+    if (!lot) continue;
+    getNeighbors(lot).forEach((neighbor) => {
+      if (!visited.has(neighbor.id)) {
+        queue.push(neighbor.id);
+      }
+    });
+  }
+
+  return [...visited];
+}
+
+function getShopNeighborLinks(lotId) {
+  const placedShop = currentGame?.placedShops?.[lotId];
+  const lot = lotsById.get(Number(lotId));
+  if (!placedShop || !lot) return [];
+
+  return getNeighbors(lot).flatMap((neighbor) => {
+    const neighborShop = currentGame.placedShops?.[neighbor.id];
+    if (!neighborShop || neighborShop.id !== placedShop.id || neighborShop.ownerId !== placedShop.ownerId) {
+      return [];
+    }
+
+    if (neighbor.cx > lot.cx && Math.abs(neighbor.cy - lot.cy) < lot.h * 0.5) return ["right"];
+    if (neighbor.cx < lot.cx && Math.abs(neighbor.cy - lot.cy) < lot.h * 0.5) return ["left"];
+    if (neighbor.cy > lot.cy && Math.abs(neighbor.cx - lot.cx) < lot.w * 0.5) return ["down"];
+    if (neighbor.cy < lot.cy && Math.abs(neighbor.cx - lot.cx) < lot.w * 0.5) return ["up"];
+    return [];
+  });
+}
+
+function getPlayerStatsText(player) {
+  if (!currentGame) return player.stats;
+
+  const publicLots = currentGame.publicLots || [];
+  const placedShops = Object.values(currentGame.placedShops || {});
+  const lotCount = publicLots.filter((item) => item.playerId === player.id || item.name === player.name).length;
+  const shopCount = placedShops.filter((shop) => shop.ownerId === player.id || shop.ownerName === player.name).length;
+  return `${lotCount} 地块 · ${shopCount} 商铺`;
 }
 
 function renderPlayers() {
@@ -382,10 +518,10 @@ function renderPlayers() {
     const playerEl = document.createElement("article");
     playerEl.className = player.you || player.id === currentPlayerId ? "player is-you" : "player";
     playerEl.innerHTML = `
-      <span class="avatar ${player.color}"></span>
+        <span class="avatar ${player.color}"></span>
       <div>
         <strong>${player.name}</strong>
-        <small>${player.stats}</small>
+        <small>${getPlayerStatsText(player)}</small>
       </div>
     `;
     playersList.appendChild(playerEl);
@@ -393,10 +529,10 @@ function renderPlayers() {
     const modalEl = document.createElement("article");
     modalEl.className = playerEl.className;
     modalEl.innerHTML = `
-      <span class="avatar ${player.color}"></span>
+        <span class="avatar ${player.color}"></span>
       <div>
         <strong>${player.name}</strong>
-        <small>${player.stats} · 现金 50万</small>
+        <small>${getPlayerStatsText(player)} · 现金 50万</small>
       </div>
     `;
     playerModalList.appendChild(modalEl);
@@ -438,7 +574,26 @@ function getStarterPlayer() {
 
 function renderStarterWheel() {
   const starter = getStarterPlayer();
-  starterWheel.innerHTML = `<span class="starter-name">${starter?.name || "..."}</span>`;
+  const starterIndex = Math.max(0, room.players.findIndex((player) => player.id === starter?.id));
+  const angleStep = 360 / room.players.length;
+  const ringStops = room.players.map((player, index) => {
+    const start = index * angleStep - angleStep / 2;
+    const end = start + angleStep;
+    const gapStart = Math.max(start, end - 1.8);
+    return `${playerRingColors[player.color] || "rgba(214, 167, 58, 0.74)"} ${start}deg ${gapStart}deg, rgba(245, 211, 129, 0.92) ${gapStart}deg ${end}deg`;
+  }).join(", ");
+
+  starterWheel.style.setProperty("--starter-angle", `${starterIndex * angleStep}deg`);
+  starterWheel.style.setProperty("--ring-bg", `conic-gradient(${ringStops})`);
+  starterWheel.innerHTML = `
+    <div class="starter-player-ring" aria-hidden="true"></div>
+    <div class="starter-wheel-core" aria-hidden="true"></div>
+    ${room.players.map((player, index) => `
+      <span class="starter-name ${player.color}" style="--label-angle: ${index * angleStep}deg">
+        ${player.name}
+      </span>
+    `).join("")}
+  `;
   starterResult.textContent = "转盘转动中...";
   starterWheel.classList.remove("is-spinning");
 
@@ -515,7 +670,12 @@ function updateDraftSummary() {
   }
 
   if (currentGame.phase === "shop-draft") {
-    selectedSummary.textContent = `店铺 ${currentGame.shopCards?.length || currentGame.shopTileDrawCount} 张`;
+    const shopCount = Array.isArray(currentGame.shopCards)
+      ? currentGame.shopCards.length
+      : currentGame.shopTileDrawCount;
+    selectedSummary.textContent = selectedShopCardId
+      ? "选择自己的空地块放置店铺"
+      : `店铺 ${shopCount} 张 · 先选店铺`;
   }
 }
 
@@ -605,7 +765,15 @@ function renderShops() {
     return;
   }
 
-  const shopCards = currentGame?.shopCards?.length ? currentGame.shopCards : shopCatalog;
+  const shopCards = currentGame ? (currentGame.shopCards || []) : shopCatalog;
+  if (!shopCards.length) {
+    const chip = document.createElement("div");
+    chip.className = "shop-chip wide";
+    chip.innerHTML = "<span>本轮店铺已放置完</span><strong>完成</strong>";
+    shopGrid.appendChild(chip);
+    return;
+  }
+
   const groupedShops = [...shopCards.reduce((groups, shop) => {
     const group = groups.get(shop.id) || { ...shop, count: 0 };
     group.count += 1;
@@ -626,16 +794,25 @@ function renderShops() {
     chip.addEventListener("click", () => {
       const previousSelected = shopGrid.querySelector(".shop-card.is-selected");
       selectedShopCardId = selectedShopCardId === shop.id ? null : shop.id;
-      selectedSummary.textContent = selectedShopCardId ? `已选店铺：${shop.name} · ${shop.count} 张` : "未选择店铺";
+      selectedSummary.textContent = selectedShopCardId
+        ? `已选 ${shop.name} · 点击自己的空地块放置`
+        : "未选择店铺";
       previousSelected?.classList.remove("is-selected");
       chip.classList.toggle("is-selected", selectedShopCardId === shop.id);
+      renderBoard();
     });
     shopGrid.appendChild(chip);
   });
 }
 
 function makeShopCandidates(count) {
-  return shopCatalog.slice(0, count).map((shop, index) => ({
+  const testPattern = ["laundry", "laundry", "laundry", "tea", "tea", "restaurant"];
+  const candidates = testPattern.slice(0, count).map((shopId) => shopCatalog.find((shop) => shop.id === shopId));
+  const source = candidates.length === count && candidates.every(Boolean)
+    ? candidates
+    : shopCatalog.slice(0, count);
+
+  return source.map((shop, index) => ({
     ...shop,
     cardId: `${shop.id}-local-${index + 1}`,
   }));
@@ -643,10 +820,16 @@ function makeShopCandidates(count) {
 
 function applyPublicLotsToBoard(publicLots = []) {
   lotOwners = {};
+  const placedShops = currentGame?.placedShops || {};
   publicLots.forEach((item) => {
+    const placedShop = placedShops[item.lotId];
     lotOwners[item.lotId] = {
       name: item.name,
+      playerId: item.playerId,
       className: ownerClassByColor[item.color] || "owner-red",
+      shop: placedShop?.name,
+      shopId: placedShop?.id,
+      shopMark: placedShop?.mark,
     };
   });
   renderBoard();
@@ -692,6 +875,7 @@ function finishLocalBuildingDraft(keptIds) {
   const otherLots = room.players.slice(1).flatMap((player, playerIndex) => (
     discarded.slice(playerIndex * 2, playerIndex * 2 + 2).map((lotId) => ({
       lotId,
+      playerId: player.id,
       name: player.name,
       color: player.color,
     }))
@@ -704,6 +888,7 @@ function finishLocalBuildingDraft(keptIds) {
   currentGame.publicLots = [
     ...keptIds.map((lotId) => ({
       lotId,
+      playerId: selfPlayer.id,
       name: selfPlayer.name,
       color: selfPlayer.color,
     })),
@@ -775,7 +960,280 @@ function confirmBuildingDraft() {
   finishLocalBuildingDraft(keptIds);
 }
 
+function getSelfPlayer() {
+  return room?.players.find((player) => player.id === currentPlayerId || player.you) || room?.players[0];
+}
+
+function getTradeTargets() {
+  const self = getSelfPlayer();
+  return (room?.players || []).filter((player) => player.id !== self?.id && !player.you);
+}
+
+function groupShopCards(cards = []) {
+  return [...cards.reduce((groups, shop) => {
+    const group = groups.get(shop.id) || { ...shop, count: 0 };
+    group.count += 1;
+    groups.set(shop.id, group);
+    return groups;
+  }, new Map()).values()];
+}
+
+function toggleTradeSet(setName, value) {
+  const targetSet = tradeDraft[setName];
+  if (targetSet.has(value)) {
+    targetSet.delete(value);
+  } else {
+    targetSet.add(value);
+  }
+  renderTradeModal();
+}
+
+function renderTradeChips(items, setName, labeler) {
+  if (!items.length) return `<p class="trade-empty">暂无可选项</p>`;
+
+  return items.map((item) => {
+    const value = String(item.value);
+    const selected = tradeDraft[setName].has(value) ? " is-selected" : "";
+    return `<button class="trade-chip${selected}" data-set="${setName}" data-value="${value}" type="button">${labeler(item)}</button>`;
+  }).join("");
+}
+
+function getPlayerCashLimit() {
+  return 5;
+}
+
+function renderCashSlider(name, label, max) {
+  const value = tradeDraft[name];
+  return `
+    <label class="trade-cash">
+      <span>${label}<b data-cash-value="${name}">${value}万</b></span>
+      <input data-cash="${name}" max="${max}" min="0" step="1" type="range" value="${value}" />
+    </label>
+  `;
+}
+
+function renderTradeShopStacks(items, mapName) {
+  if (!items.length) return `<p class="trade-empty">暂无可选项</p>`;
+
+  return items.map((shop) => {
+    const qty = tradeDraft[mapName].get(shop.id) || 0;
+    const selected = qty > 0 ? " is-selected" : "";
+    return `
+      <article class="trade-shop${selected}">
+        <button data-shop-step="1" data-map="${mapName}" data-shop-id="${shop.id}" data-max="${shop.count}" type="button">
+          <img src="${shop.image}" alt="${shop.name}" loading="lazy" />
+          <strong>x${shop.count}</strong>
+          <em data-shop-picked>${qty ? `x${qty}` : ""}</em>
+        </button>
+        <div class="trade-stepper">
+          <button data-shop-step="-1" data-map="${mapName}" data-shop-id="${shop.id}" data-max="${shop.count}" type="button">-</button>
+          <b data-shop-count>${qty}</b>
+          <button data-shop-step="1" data-map="${mapName}" data-shop-id="${shop.id}" data-max="${shop.count}" type="button">+</button>
+        </div>
+      </article>
+    `;
+  }).join("");
+}
+
+function adjustTradeShop(mapName, shopId, step, max, element) {
+  const targetMap = tradeDraft[mapName];
+  const next = Math.max(0, Math.min(max, (targetMap.get(shopId) || 0) + step));
+
+  if (next) {
+    targetMap.set(shopId, next);
+  } else {
+    targetMap.delete(shopId);
+  }
+
+  const shopEl = element?.closest(".trade-shop");
+  if (!shopEl) return;
+  shopEl.classList.toggle("is-selected", next > 0);
+  const countEl = shopEl.querySelector("[data-shop-count]");
+  const pickedEl = shopEl.querySelector("[data-shop-picked]");
+  if (countEl) countEl.textContent = String(next);
+  if (pickedEl) pickedEl.textContent = next ? `x${next}` : "";
+}
+
+function renderTradeModal() {
+  const targets = getTradeTargets();
+  const target = targets.find((player) => player.id === tradeDraft.targetId) || targets[0];
+  tradeDraft.targetId = target?.id || null;
+
+  const selfCashLimit = getPlayerCashLimit(getSelfPlayer());
+  const targetCashLimit = getPlayerCashLimit(target);
+  const selfLots = (currentGame?.keptBuildingIds || []).map((id) => ({ value: id, text: `${id}` }));
+  const targetLots = (currentGame?.publicLots || [])
+    .filter((item) => item.playerId === target?.id || item.name === target?.name)
+    .map((item) => ({ value: item.lotId, text: `${item.lotId}` }));
+  const ownShops = groupShopCards(currentGame?.shopCards || []);
+  const requestShops = shopCatalog.map((shop) => ({ ...shop, count: shop.size + 3 }));
+
+  tradeBody.innerHTML = `
+    <div class="trade-targets">
+      ${targets.map((player) => `
+        <button class="${player.id === tradeDraft.targetId ? "is-selected" : ""}" data-target="${player.id}" type="button">
+          <span class="avatar ${player.color}"></span>${player.name}
+        </button>
+      `).join("") || "<p class=\"trade-empty\">暂无其他玩家</p>"}
+    </div>
+
+    <div class="trade-columns">
+      <section>
+        <h3>我给出</h3>
+        ${renderCashSlider("offerCash", "现金", selfCashLimit)}
+        <h4>地块</h4>
+        <div class="trade-chip-grid">${renderTradeChips(selfLots, "offerLots", (item) => item.text)}</div>
+        <h4>店铺</h4>
+        <div class="trade-shop-grid">${renderTradeShopStacks(ownShops, "offerShops")}</div>
+      </section>
+      <section>
+        <h3>我想要</h3>
+        ${renderCashSlider("requestCash", "现金", targetCashLimit)}
+        <h4>${target?.name || "对方"}的地块</h4>
+        <div class="trade-chip-grid">${renderTradeChips(targetLots, "requestLots", (item) => item.text)}</div>
+        <h4>店铺</h4>
+        <div class="trade-shop-grid">${renderTradeShopStacks(requestShops, "requestShops")}</div>
+      </section>
+    </div>
+  `;
+}
+
+function openTradeModal() {
+  tradeDraft = makeEmptyTradeDraft();
+  tradeDraft.targetId = getTradeTargets()[0]?.id || null;
+  renderTradeModal();
+  tradeModal.setAttribute("aria-hidden", "false");
+}
+
+function summarizeTradeDraft() {
+  const target = getTradeTargets().find((player) => player.id === tradeDraft.targetId);
+  const bits = [];
+  const shopName = (shopId) => shopCatalog.find((shop) => shop.id === shopId)?.name || shopId;
+  const shopSummary = (shopMap) => [...shopMap.entries()]
+    .filter(([, count]) => count > 0)
+    .map(([shopId, count]) => `${shopName(shopId)}x${count}`)
+    .join("、");
+  const offerShopText = shopSummary(tradeDraft.offerShops);
+  const requestShopText = shopSummary(tradeDraft.requestShops);
+
+  if (tradeDraft.offerLots.size) bits.push(`给地块 ${[...tradeDraft.offerLots].join("、")}`);
+  if (offerShopText) bits.push(`给店铺 ${offerShopText}`);
+  if (tradeDraft.offerCash) bits.push(`给现金 ${tradeDraft.offerCash}万`);
+  if (tradeDraft.requestLots.size) bits.push(`要地块 ${[...tradeDraft.requestLots].join("、")}`);
+  if (requestShopText) bits.push(`要店铺 ${requestShopText}`);
+  if (tradeDraft.requestCash) bits.push(`要现金 ${tradeDraft.requestCash}万`);
+
+  selectedSummary.textContent = bits.length
+    ? `向${target?.name || "玩家"}提议：${bits.join("；")}`
+    : "交易提议为空";
+  tradeModal.setAttribute("aria-hidden", "true");
+}
+
+function getSelectedShopCard() {
+  return (currentGame?.shopCards || []).find((shop) => shop.id === selectedShopCardId);
+}
+
+function getLotPublicOwner(lotId) {
+  return (currentGame?.publicLots || []).find((item) => item.lotId === lotId);
+}
+
+function ownsLot(player, lotOwner) {
+  return Boolean(player && lotOwner && (lotOwner.playerId === player.id || lotOwner.name === player.name));
+}
+
+function canPlaceShopOnLot(lotId) {
+  if (currentGame?.phase !== "shop-draft") return { ok: false, message: "当前还不能放置店铺" };
+  if (!selectedShopCardId) return { ok: false, message: "请先选择一个店铺" };
+  if (currentGame.placedShops?.[lotId]) return { ok: false, message: `${lotId}号地块已经有店铺` };
+
+  const self = getSelfPlayer();
+  const owner = getLotPublicOwner(lotId);
+  if (!ownsLot(self, owner)) return { ok: false, message: "只能放在你自己的空地块上" };
+
+  const shop = getSelectedShopCard();
+  if (!shop) return { ok: false, message: "这个店铺已经用完了" };
+
+  return { ok: true, shop, owner };
+}
+
+function getShopGroupProgress(lotId) {
+  const placedShop = currentGame?.placedShops?.[lotId];
+  if (!placedShop) return null;
+
+  const visited = new Set();
+  const queue = [Number(lotId)];
+
+  while (queue.length) {
+    const nextId = queue.shift();
+    if (visited.has(nextId)) continue;
+    const nextShop = currentGame.placedShops[nextId];
+    if (!nextShop) continue;
+    if (nextShop.id !== placedShop.id || nextShop.ownerId !== placedShop.ownerId) continue;
+
+    visited.add(nextId);
+    const lot = lotsById.get(nextId);
+    if (!lot) continue;
+
+    getNeighbors(lot).forEach((neighbor) => {
+      if (!visited.has(neighbor.id)) {
+        queue.push(neighbor.id);
+      }
+    });
+  }
+
+  return {
+    name: placedShop.name,
+    current: visited.size,
+    max: placedShop.size,
+  };
+}
+
+function removeOneShopCard(shopId) {
+  const index = currentGame.shopCards.findIndex((shop) => shop.id === shopId);
+  if (index >= 0) {
+    currentGame.shopCards.splice(index, 1);
+  }
+}
+
+function placeSelectedShop(lotId) {
+  const result = canPlaceShopOnLot(lotId);
+  if (!result.ok) {
+    selectedSummary.textContent = result.message;
+    return false;
+  }
+
+  const { shop, owner } = result;
+  currentGame.placedShops ||= {};
+  currentGame.placedShops[lotId] = {
+    id: shop.id,
+    name: shop.name,
+    mark: shop.mark,
+    image: shop.image,
+    size: shop.size,
+    ownerId: owner.playerId || getSelfPlayer()?.id,
+    ownerName: owner.name,
+  };
+
+  removeOneShopCard(shop.id);
+  selectedShopCardId = (currentGame.shopCards || []).some((item) => item.id === shop.id) ? shop.id : null;
+  applyPublicLotsToBoard(currentGame.publicLots || []);
+  renderPlayers();
+  renderShops();
+  activateTab("shops");
+
+  const progress = getShopGroupProgress(lotId);
+  selectedSummary.textContent = progress
+    ? `${lotId}号放置${shop.name} · 规模 ${progress.current}/${progress.max}`
+    : `${lotId}号放置${shop.name}`;
+  return true;
+}
+
 function selectCell(id, element) {
+  if (selectedShopCardId) {
+    placeSelectedShop(id);
+    return;
+  }
+
   if (selectedCell === element) {
     clearSelection();
     return;
@@ -788,7 +1246,9 @@ function selectCell(id, element) {
   const owner = lotOwners[id];
   const lot = lotsById.get(id);
   const neighborIds = getNeighbors(lot).map((neighbor) => neighbor.id).join("、") || "无";
-  const ownerText = owner ? `${owner.name}${owner.shop ? ` · ${owner.shop}` : ""}` : "无主";
+  const progress = getShopGroupProgress(id);
+  const shopText = progress ? ` · ${progress.name} ${progress.current}/${progress.max}` : "";
+  const ownerText = owner ? `${owner.name}${shopText}` : "无主";
   selectedSummary.textContent = `${id}号地块 · ${ownerText} · 邻 ${neighborIds}`;
 }
 
@@ -905,7 +1365,57 @@ playersButton.addEventListener("click", () => {
 });
 
 document.querySelector("#startTradeButton").addEventListener("click", () => {
-  selectedSummary.textContent = "交易功能下一步接入：选择对象、地块、商铺和现金。";
+  openTradeModal();
+});
+
+tradeBody.addEventListener("click", (event) => {
+  const targetButton = event.target.closest("[data-target]");
+  if (targetButton) {
+    tradeDraft.targetId = targetButton.dataset.target;
+    tradeDraft.requestLots.clear();
+    tradeDraft.requestShops.clear();
+    renderTradeModal();
+    return;
+  }
+
+  const shopButton = event.target.closest("[data-shop-step]");
+  if (shopButton) {
+    adjustTradeShop(
+      shopButton.dataset.map,
+      shopButton.dataset.shopId,
+      Number(shopButton.dataset.shopStep),
+      Number(shopButton.dataset.max),
+      shopButton,
+    );
+    return;
+  }
+
+  const chip = event.target.closest("[data-set]");
+  if (chip) {
+    toggleTradeSet(chip.dataset.set, chip.dataset.value);
+  }
+});
+
+tradeBody.addEventListener("input", (event) => {
+  const cashName = event.target.dataset.cash;
+  if (!cashName) return;
+  tradeDraft[cashName] = Math.max(0, Number(event.target.value || 0));
+  const valueLabel = tradeBody.querySelector(`[data-cash-value="${cashName}"]`);
+  if (valueLabel) {
+    valueLabel.textContent = `${tradeDraft[cashName]}万`;
+  }
+});
+
+submitTrade.addEventListener("click", summarizeTradeDraft);
+
+document.querySelector("#closeTrade").addEventListener("click", () => {
+  tradeModal.setAttribute("aria-hidden", "true");
+});
+
+tradeModal.addEventListener("click", (event) => {
+  if (event.target === tradeModal) {
+    tradeModal.setAttribute("aria-hidden", "true");
+  }
 });
 
 document.querySelector("#closePlayers").addEventListener("click", () => {
@@ -1009,6 +1519,9 @@ if (isDevMode) {
   currentGame = makeDevGame();
   renderStarterWheel();
   showScreen(starterScreen);
+  if (params.get("trade") === "1") {
+    window.setTimeout(openTradeModal, 5200);
+  }
 } else {
   showScreen(homeScreen);
 }
