@@ -633,6 +633,61 @@ function renderIncomeHint() {
   `;
 }
 
+function openHintModal() {
+  hintModal.setAttribute("aria-hidden", "false");
+}
+
+function closeHintModal() {
+  hintModal.setAttribute("aria-hidden", "true");
+}
+
+function renderRoundAdvanceConfirm() {
+  const remaining = currentGame?.shopCards?.length || 0;
+  hintTitle.textContent = "进入下一轮？";
+  hintContent.innerHTML = `
+    <p>确认后，本轮会先进行收入结算，然后再进入下一轮。</p>
+    <p class="hint-note">${remaining ? `你还有 ${remaining} 张未放置店铺，会继续保留在手中。` : "你本轮手上没有未放置店铺。"}</p>
+    <div class="modal-actions">
+      <button class="modal-secondary" data-modal-close type="button">继续放置</button>
+      <button class="modal-primary" data-confirm-next-round type="button">确认进入下一轮</button>
+    </div>
+  `;
+  openHintModal();
+}
+
+function renderIncomeSettlementModal() {
+  const self = getSelfPlayer();
+  const rows = (currentGame?.incomeRows || []).filter((row) => row.playerId === self?.id);
+  const total = getIncomeTotalForPlayer(self?.id);
+  const rowHtml = rows.length
+    ? rows.map((row) => {
+      const splitLabel = row.partCount > 1 ? ` · 第${row.partIndex}组` : "";
+      return `
+        <article class="modal-income-row">
+          <div>
+            <strong>${escapeHtml(row.shopName)}</strong>
+            <small>${row.complete ? "完成" : "未完成"} · ${row.size}/${row.maxSize}${splitLabel} · 地块 ${row.lotIds.join("、")}</small>
+          </div>
+          <b>+${formatMoney(row.income)}</b>
+        </article>
+      `;
+    }).join("")
+    : `<p class="hint-note">你本轮还没有可结算的店铺。</p>`;
+
+  hintTitle.textContent = "本回合收入结算";
+  hintContent.innerHTML = `
+    <div class="modal-income-total">
+      <span>本轮收入</span>
+      <strong>+${formatMoney(total)}</strong>
+    </div>
+    <div class="modal-income-list">${rowHtml}</div>
+    <div class="modal-actions">
+      <button class="modal-primary" data-income-next type="button">${currentGame.round >= 6 ? "查看最终排名" : "进入下一轮"}</button>
+    </div>
+  `;
+  openHintModal();
+}
+
 function renderPlayers() {
   playersList.innerHTML = "";
   playerModalList.innerHTML = "";
@@ -1005,7 +1060,7 @@ function renderShopPlacementAction() {
   const remaining = currentGame.shopCards?.length || 0;
   action.type = "button";
   action.className = "confirm-draft shop-confirm";
-  action.textContent = remaining ? `确认放置 · 剩余 ${remaining} 张` : "确认放置并结算收入";
+  action.textContent = remaining ? `进入下一轮 · 保留 ${remaining} 张` : "进入下一轮";
   action.addEventListener("click", confirmShopPlacement);
   shopGrid.appendChild(action);
 }
@@ -1571,6 +1626,12 @@ function renderFinalPanel() {
 function confirmShopPlacement() {
   if (currentGame?.phase !== "shop-draft") return;
 
+  renderRoundAdvanceConfirm();
+}
+
+function finalizeShopPlacementAndShowIncome() {
+  if (currentGame?.phase !== "shop-draft") return;
+
   selectedShopCardId = null;
   currentGame.shopPlacementConfirmed = true;
   currentGame.shopReadyCount = room.playerCount;
@@ -1582,11 +1643,13 @@ function confirmShopPlacement() {
   renderShops();
   updateDraftSummary();
   cashLabel.textContent = formatMoney(getPlayerCash(getSelfPlayer()));
+  renderIncomeSettlementModal();
 }
 
 function agreeToAdvanceAfterIncome() {
   if (!currentGame) return;
 
+  closeHintModal();
   currentGame.nextRoundReadyCount = room.playerCount;
   selectedSummary.textContent = currentGame.round >= 6
     ? `已同意最终结算 ${currentGame.nextRoundReadyCount}/${room.playerCount}`
@@ -1813,7 +1876,7 @@ document.querySelector("#startGameButton").addEventListener("click", () => {
 
 document.querySelector("#hintButton").addEventListener("click", () => {
   renderIncomeHint();
-  hintModal.setAttribute("aria-hidden", "false");
+  openHintModal();
 });
 
 playersButton.addEventListener("click", () => {
@@ -1884,13 +1947,27 @@ playersModal.addEventListener("click", (event) => {
   }
 });
 
-document.querySelector("#closeHint").addEventListener("click", () => {
-  hintModal.setAttribute("aria-hidden", "true");
+document.querySelector("#closeHint").addEventListener("click", closeHintModal);
+
+hintContent.addEventListener("click", (event) => {
+  if (event.target.closest("[data-modal-close]")) {
+    closeHintModal();
+    return;
+  }
+
+  if (event.target.closest("[data-confirm-next-round]")) {
+    finalizeShopPlacementAndShowIncome();
+    return;
+  }
+
+  if (event.target.closest("[data-income-next]")) {
+    agreeToAdvanceAfterIncome();
+  }
 });
 
 hintModal.addEventListener("click", (event) => {
   if (event.target === hintModal) {
-    hintModal.setAttribute("aria-hidden", "true");
+    closeHintModal();
   }
 });
 
