@@ -6,10 +6,10 @@ const ownerClassByColor = {
 };
 
 const playerPresets = [
-  { name: "你", color: "red", stats: "3 地块 · 2 商铺", you: true },
-  { name: "阿明", color: "cyan", stats: "3 地块 · 2 商铺" },
-  { name: "小林", color: "gold", stats: "3 地块 · 2 商铺" },
-  { name: "阿青", color: "green", stats: "0 地块 · 0 商铺" },
+  { name: "你", color: "red", stats: "3 地块 · 2 商铺", cash: 5, you: true },
+  { name: "阿明", color: "cyan", stats: "3 地块 · 2 商铺", cash: 5 },
+  { name: "小林", color: "gold", stats: "3 地块 · 2 商铺", cash: 5 },
+  { name: "阿青", color: "green", stats: "0 地块 · 0 商铺", cash: 5 },
 ];
 
 const playerRingColors = {
@@ -124,19 +124,25 @@ const lotLayout = [
 
 const handCards = [7, 12, 18];
 const shopCatalog = [
-  { id: "antique", name: "古董店", mark: "古", size: 5, image: "assets/shop-icons/古董店.png" },
+  { id: "antique", name: "古董店", mark: "古", size: 6, image: "assets/shop-icons/古董店.png" },
   { id: "photo", name: "照相馆", mark: "照", size: 3, image: "assets/shop-icons/照相馆.png" },
   { id: "factory", name: "工厂", mark: "工", size: 6, image: "assets/shop-icons/工厂.png" },
-  { id: "clothing", name: "服装店", mark: "服", size: 5, image: "assets/shop-icons/服装店.png" },
-  { id: "laundry", name: "洗衣店", mark: "洗", size: 4, image: "assets/shop-icons/洗衣店.png" },
+  { id: "clothing", name: "服装店", mark: "服", size: 4, image: "assets/shop-icons/服装店.png" },
+  { id: "laundry", name: "洗衣店", mark: "洗", size: 5, image: "assets/shop-icons/洗衣店.png" },
   { id: "tea", name: "茶馆", mark: "茶", size: 3, image: "assets/shop-icons/茶馆.png" },
-  { id: "restaurant", name: "饭店", mark: "饭", size: 4, image: "assets/shop-icons/饭店.png" },
+  { id: "restaurant", name: "饭店", mark: "饭", size: 6, image: "assets/shop-icons/饭店.png" },
   { id: "pawn", name: "当铺", mark: "当", size: 5, image: "assets/shop-icons/当铺.png" },
   { id: "florist", name: "花店", mark: "花", size: 4, image: "assets/shop-icons/花店.png" },
-  { id: "dimsum", name: "点心店", mark: "点", size: 3, image: "assets/shop-icons/点心店.png" },
-  { id: "jewelry", name: "珠宝店", mark: "宝", size: 6, image: "assets/shop-icons/珠宝店.png" },
+  { id: "dimsum", name: "点心店", mark: "点", size: 5, image: "assets/shop-icons/点心店.png" },
+  { id: "jewelry", name: "珠宝店", mark: "宝", size: 4, image: "assets/shop-icons/珠宝店.png" },
   { id: "seafood", name: "海鲜店", mark: "鲜", size: 3, image: "assets/shop-icons/海鲜店.png" },
 ];
+
+const incomeTable = {
+  incomplete: { 1: 1, 2: 2, 3: 4, 4: 6, 5: 8 },
+  complete: { 3: 5, 4: 8, 5: 11, 6: 14 },
+};
+const tradeCashLimit = 50;
 
 const board = document.querySelector("#board");
 const boardWrap = document.querySelector("#boardWrap");
@@ -171,6 +177,8 @@ const playersModal = document.querySelector("#playersModal");
 const playersTitle = document.querySelector("#playersTitle");
 const playerModalList = document.querySelector("#playerModalList");
 const hintModal = document.querySelector("#hintModal");
+const hintTitle = document.querySelector("#hintTitle");
+const hintContent = document.querySelector("#hintContent");
 const tradeModal = document.querySelector("#tradeModal");
 const tradeBody = document.querySelector("#tradeBody");
 const submitTrade = document.querySelector("#submitTrade");
@@ -178,8 +186,9 @@ const socket = typeof io === "function" ? io() : null;
 const params = new URLSearchParams(window.location.search);
 const isDevMode = params.get("dev") === "1";
 const isCoordMode = params.get("coords") === "1";
+const devPlayerCount = [3, 4].includes(Number(params.get("players"))) ? Number(params.get("players")) : 3;
 let selectedCell = null;
-let selectedRoomSize = 3;
+let selectedRoomSize = devPlayerCount;
 let room = null;
 let currentGame = null;
 let currentPlayerId = null;
@@ -246,6 +255,7 @@ function makeRoom(playerCount, code = makeRoomCode()) {
     ...player,
     id: index === 0 ? "local-host" : `local-player-${index}`,
     name: index === 0 ? hostName : player.name,
+    cash: player.cash ?? 5,
     ready: true,
   }));
 
@@ -289,7 +299,14 @@ function makeLocalGame() {
     buildingKeepCount: rule.keep,
     buildingDealCount: rule.deal,
     shopCards: [],
+    playerShopHands: {},
+    shopDealRounds: {},
     placedShops: {},
+    incomeRows: [],
+    incomeSettled: false,
+    nextRoundReadyCount: 0,
+    shopPlacementConfirmed: false,
+    shopReadyCount: 0,
     shopTileDrawCount: rule.shops,
     deckRemaining: 85 - rule.deal * room.playerCount,
   };
@@ -307,10 +324,30 @@ function makeDevGame() {
     buildingKeepCount: 5,
     buildingDealCount: 7,
     shopCards: [],
+    playerShopHands: {},
+    shopDealRounds: {},
     placedShops: {},
+    incomeRows: [],
+    incomeSettled: false,
+    nextRoundReadyCount: 0,
+    shopPlacementConfirmed: false,
+    shopReadyCount: 0,
     shopTileDrawCount: 6,
     deckRemaining: 64,
   };
+}
+
+function formatMoney(value) {
+  return `${Number(value.toFixed(1)).toLocaleString("zh-CN")}万元`;
+}
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
 }
 
 function setHomeError(message = "") {
@@ -505,35 +542,140 @@ function getPlayerStatsText(player) {
   return `${lotCount} 地块 · ${shopCount} 商铺`;
 }
 
+function getPlayerCash(player) {
+  return player?.cash ?? 5;
+}
+
+function getPlayerLotIds(player) {
+  if (!currentGame) return [];
+
+  return (currentGame.publicLots || [])
+    .filter((item) => item.playerId === player.id || item.name === player.name)
+    .map((item) => item.lotId)
+    .sort((a, b) => a - b);
+}
+
+function getPlayerHandShops(player) {
+  if (!currentGame) return null;
+
+  const self = getSelfPlayer();
+  if (player.id === self?.id || player.you) {
+    return currentGame.shopCards?.length ? currentGame.shopCards : (currentGame.playerShopHands?.[player.id] || null);
+  }
+
+  return currentGame.playerShopHands?.[player.id] || null;
+}
+
+function renderMiniTokens(values, emptyText) {
+  if (!values.length) {
+    return `<span class="mini-empty">${escapeHtml(emptyText)}</span>`;
+  }
+
+  return values.map((value) => `<span class="mini-token">${escapeHtml(value)}</span>`).join("");
+}
+
+function renderPlayerShopTokens(player) {
+  const shops = getPlayerHandShops(player);
+  if (shops === null) {
+    return `<span class="mini-empty">店铺尚未发放</span>`;
+  }
+
+  const grouped = groupShopCards(shops);
+  if (!grouped.length) {
+    return `<span class="mini-empty">手上暂无店铺</span>`;
+  }
+
+  return grouped.map((shop) => `
+    <span class="player-shop-token">
+      <img src="${escapeHtml(shop.image)}" alt="${escapeHtml(shop.name)}" loading="lazy" />
+      <b>${shop.count}</b>
+    </span>
+  `).join("");
+}
+
+function renderIncomeHint() {
+  hintTitle.textContent = "收入表";
+  hintContent.innerHTML = `
+    <table class="income-hint-table">
+      <thead>
+        <tr>
+          <th>规模</th>
+          <th>1</th>
+          <th>2</th>
+          <th>3</th>
+          <th>4</th>
+          <th>5</th>
+          <th>6</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <th>未完成</th>
+          <td>1万</td>
+          <td>2万</td>
+          <td>4万</td>
+          <td>6万</td>
+          <td>8万</td>
+          <td>-</td>
+        </tr>
+        <tr>
+          <th>完成</th>
+          <td>-</td>
+          <td>-</td>
+          <td>5万</td>
+          <td>8万</td>
+          <td>11万</td>
+          <td>14万</td>
+        </tr>
+      </tbody>
+    </table>
+    <p class="hint-note">完成表示同类店铺连接数量达到店铺图标上的最大规模。玩家现金按规则保密。</p>
+  `;
+}
+
 function renderPlayers() {
   playersList.innerHTML = "";
   playerModalList.innerHTML = "";
   const activePlayers = room?.players || playerPresets.slice(0, selectedRoomSize);
   playersList.className = `player-list count-${activePlayers.length}`;
+  playerModalList.className = `player-modal-list count-${activePlayers.length}`;
   playerCountLabel.textContent = `${activePlayers.length}人局`;
   playersButton.textContent = "玩家";
   playersTitle.textContent = `${activePlayers.length}人局玩家`;
 
   activePlayers.forEach((player) => {
+    const isSelf = player.you || player.id === currentPlayerId;
+    const lotIds = getPlayerLotIds(player);
+    const cashText = isSelf ? `我的现金：${formatMoney(getPlayerCash(player))}` : "现金：保密";
     const playerEl = document.createElement("article");
-    playerEl.className = player.you || player.id === currentPlayerId ? "player is-you" : "player";
+    playerEl.className = isSelf ? "player is-you" : "player";
     playerEl.innerHTML = `
         <span class="avatar ${player.color}"></span>
       <div>
-        <strong>${player.name}</strong>
+        <strong>${escapeHtml(player.name)}</strong>
         <small>${getPlayerStatsText(player)}</small>
       </div>
     `;
     playersList.appendChild(playerEl);
 
     const modalEl = document.createElement("article");
-    modalEl.className = playerEl.className;
+    modalEl.className = isSelf ? "player-detail is-you" : "player-detail";
     modalEl.innerHTML = `
+      <header>
         <span class="avatar ${player.color}"></span>
-      <div>
-        <strong>${player.name}</strong>
-        <small>${getPlayerStatsText(player)} · 现金 50万</small>
-      </div>
+        <div>
+          <strong>${escapeHtml(player.name)}</strong>
+          <small>${cashText}</small>
+        </div>
+      </header>
+      <section>
+        <h3>地块</h3>
+        <div class="mini-token-list">${renderMiniTokens(lotIds, "暂无地块")}</div>
+      </section>
+      <section>
+        <h3>手上店铺</h3>
+        <div class="player-shop-list">${renderPlayerShopTokens(player)}</div>
+      </section>
     `;
     playerModalList.appendChild(modalEl);
   });
@@ -577,19 +719,19 @@ function renderStarterWheel() {
   const starterIndex = Math.max(0, room.players.findIndex((player) => player.id === starter?.id));
   const angleStep = 360 / room.players.length;
   const ringStops = room.players.map((player, index) => {
-    const start = index * angleStep - angleStep / 2;
+    const start = index * angleStep;
     const end = start + angleStep;
     const gapStart = Math.max(start, end - 1.8);
     return `${playerRingColors[player.color] || "rgba(214, 167, 58, 0.74)"} ${start}deg ${gapStart}deg, rgba(245, 211, 129, 0.92) ${gapStart}deg ${end}deg`;
   }).join(", ");
 
-  starterWheel.style.setProperty("--starter-angle", `${starterIndex * angleStep}deg`);
+  starterWheel.style.setProperty("--starter-angle", `${starterIndex * angleStep + angleStep / 2}deg`);
   starterWheel.style.setProperty("--ring-bg", `conic-gradient(${ringStops})`);
   starterWheel.innerHTML = `
     <div class="starter-player-ring" aria-hidden="true"></div>
     <div class="starter-wheel-core" aria-hidden="true"></div>
     ${room.players.map((player, index) => `
-      <span class="starter-name ${player.color}" style="--label-angle: ${index * angleStep}deg">
+      <span class="starter-name ${player.color}" style="--label-angle: ${index * angleStep + angleStep / 2}deg">
         ${player.name}
       </span>
     `).join("")}
@@ -633,9 +775,31 @@ function showBuildingDraft() {
   renderHand();
   renderShops();
   roundLabel.textContent = `${currentGame.round}/6轮`;
-  cashLabel.textContent = "5万元";
+  cashLabel.textContent = formatMoney(getPlayerCash(getSelfPlayer()));
   selectedSummary.textContent = `候选 ${currentGame.buildingDealCount} · 保留 ${currentGame.buildingKeepCount}`;
   showScreen(gameScreen);
+}
+
+function getRoundRules(playerCount, round) {
+  const rules = {
+    3: {
+      buildings: round === 1 ? { deal: 7, keep: 5 } : { deal: 6, keep: 4 },
+      shops: round === 1 ? 6 : 4,
+    },
+    4: {
+      buildings: round === 1 ? { deal: 6, keep: 4 } : { deal: 5, keep: 3 },
+      shops: round === 1 ? 4 : 3,
+    },
+  };
+
+  return rules[playerCount];
+}
+
+function makeBuildingCandidates(count) {
+  const ownedLots = new Set((currentGame.publicLots || []).map((item) => item.lotId));
+  return Array.from({ length: 85 }, (_, index) => index + 1)
+    .filter((id) => !ownedLots.has(id))
+    .slice(0, count);
 }
 
 function activateTab(tabName) {
@@ -676,6 +840,17 @@ function updateDraftSummary() {
     selectedSummary.textContent = selectedShopCardId
       ? "选择自己的空地块放置店铺"
       : `店铺 ${shopCount} 张 · 先选店铺`;
+    return;
+  }
+
+  if (currentGame.phase === "income") {
+    const selfIncome = getIncomeTotalForPlayer(getSelfPlayer()?.id);
+    selectedSummary.textContent = `收入结算 · 本轮 +${formatMoney(selfIncome)}`;
+    return;
+  }
+
+  if (currentGame.phase === "final") {
+    selectedSummary.textContent = "游戏结束 · 查看最终现金";
   }
 }
 
@@ -685,7 +860,7 @@ function renderHand() {
   const cards = currentGame?.buildingCards || handCards;
   const keepCount = currentGame?.buildingKeepCount;
   const isDrafting = currentGame?.phase === "building-draft";
-  const isAfterDraft = ["building-reveal", "shop-dealing", "shop-draft"].includes(currentGame?.phase);
+  const isAfterDraft = ["building-reveal", "shop-dealing", "shop-draft", "income", "final"].includes(currentGame?.phase);
   const keptIds = isAfterDraft
     ? new Set(currentGame.keptBuildingIds || [...selectedBuildingKeeps])
     : selectedBuildingKeeps;
@@ -740,13 +915,16 @@ function renderHand() {
 
 function renderShops() {
   shopGrid.innerHTML = "";
+  const heldShopCards = currentGame?.shopCards || [];
 
   if (currentGame?.phase === "building-draft") {
     const chip = document.createElement("div");
     chip.className = "shop-chip wide";
-    chip.innerHTML = `<span>本轮稍后抽取店铺</span><strong>x${currentGame.shopTileDrawCount}</strong>`;
+    chip.innerHTML = heldShopCards.length
+      ? `<span>手上保留 ${heldShopCards.length} 张 · 本轮稍后再抽</span><strong>x${currentGame.shopTileDrawCount}</strong>`
+      : `<span>本轮稍后抽取店铺</span><strong>x${currentGame.shopTileDrawCount}</strong>`;
     shopGrid.appendChild(chip);
-    return;
+    if (!heldShopCards.length) return;
   }
 
   if (currentGame?.phase === "building-reveal") {
@@ -765,12 +943,23 @@ function renderShops() {
     return;
   }
 
-  const shopCards = currentGame ? (currentGame.shopCards || []) : shopCatalog;
+  if (currentGame?.phase === "income") {
+    renderIncomePanel();
+    return;
+  }
+
+  if (currentGame?.phase === "final") {
+    renderFinalPanel();
+    return;
+  }
+
+  const shopCards = currentGame ? heldShopCards : shopCatalog;
   if (!shopCards.length) {
     const chip = document.createElement("div");
     chip.className = "shop-chip wide";
     chip.innerHTML = "<span>本轮店铺已放置完</span><strong>完成</strong>";
     shopGrid.appendChild(chip);
+    renderShopPlacementAction();
     return;
   }
 
@@ -782,16 +971,18 @@ function renderShops() {
   }, new Map()).values()];
 
   groupedShops.forEach((shop, index) => {
+    const canSelectShop = currentGame?.phase === "shop-draft";
     const chip = document.createElement("button");
     chip.type = "button";
+    chip.disabled = !canSelectShop;
     chip.className = "shop-chip shop-card";
-    chip.classList.toggle("is-selected", selectedShopCardId === shop.id);
+    chip.classList.toggle("is-selected", canSelectShop && selectedShopCardId === shop.id);
     chip.style.animationDelay = `${index * 80}ms`;
     chip.innerHTML = `
       <img src="${shop.image}" alt="${shop.name}" loading="lazy" />
       <strong aria-label="${shop.name} 数量 ${shop.count}">${shop.count}</strong>
     `;
-    chip.addEventListener("click", () => {
+    if (canSelectShop) chip.addEventListener("click", () => {
       const previousSelected = shopGrid.querySelector(".shop-card.is-selected");
       selectedShopCardId = selectedShopCardId === shop.id ? null : shop.id;
       selectedSummary.textContent = selectedShopCardId
@@ -803,19 +994,71 @@ function renderShops() {
     });
     shopGrid.appendChild(chip);
   });
+
+  renderShopPlacementAction();
 }
 
-function makeShopCandidates(count) {
-  const testPattern = ["laundry", "laundry", "laundry", "tea", "tea", "restaurant"];
-  const candidates = testPattern.slice(0, count).map((shopId) => shopCatalog.find((shop) => shop.id === shopId));
+function renderShopPlacementAction() {
+  if (currentGame?.phase !== "shop-draft") return;
+
+  const action = document.createElement("button");
+  const remaining = currentGame.shopCards?.length || 0;
+  action.type = "button";
+  action.className = "confirm-draft shop-confirm";
+  action.textContent = remaining ? `确认放置 · 剩余 ${remaining} 张` : "确认放置并结算收入";
+  action.addEventListener("click", confirmShopPlacement);
+  shopGrid.appendChild(action);
+}
+
+function makeShopCandidates(count, offset = 0) {
+  const testPattern = ["laundry", "laundry", "laundry", "tea", "tea", "restaurant", "photo", "florist", "dimsum"];
+  const start = offset % testPattern.length;
+  const rotatedPattern = testPattern.slice(start).concat(testPattern.slice(0, start));
+  const candidates = rotatedPattern.slice(0, count).map((shopId) => shopCatalog.find((shop) => shop.id === shopId));
   const source = candidates.length === count && candidates.every(Boolean)
     ? candidates
     : shopCatalog.slice(0, count);
 
   return source.map((shop, index) => ({
     ...shop,
-    cardId: `${shop.id}-local-${index + 1}`,
+    cardId: `${shop.id}-local-${offset}-${index + 1}`,
   }));
+}
+
+function dealLocalShopTilesForRound() {
+  if (!currentGame || !room) return;
+
+  currentGame.playerShopHands ||= {};
+  currentGame.shopDealRounds ||= {};
+  if (currentGame.shopDealRounds[currentGame.round]) {
+    const self = getSelfPlayer();
+    if (self) {
+      currentGame.shopCards = [...(currentGame.playerShopHands[self.id] || [])];
+    }
+    return;
+  }
+
+  room.players.forEach((player, index) => {
+    const existing = currentGame.playerShopHands[player.id] || [];
+    const newTiles = makeShopCandidates(currentGame.shopTileDrawCount, currentGame.round * 5 + index * 2);
+    currentGame.playerShopHands[player.id] = [...existing, ...newTiles];
+  });
+  currentGame.shopDealRounds[currentGame.round] = true;
+
+  const self = getSelfPlayer();
+  if (self) {
+    currentGame.shopCards = [...(currentGame.playerShopHands[self.id] || [])];
+  }
+}
+
+function syncSelfShopHand() {
+  if (!currentGame) return;
+
+  const self = getSelfPlayer();
+  if (self) {
+    currentGame.playerShopHands ||= {};
+    currentGame.playerShopHands[self.id] = [...(currentGame.shopCards || [])];
+  }
 }
 
 function applyPublicLotsToBoard(publicLots = []) {
@@ -847,9 +1090,7 @@ function showShopDraft({ animate = true } = {}) {
 
     window.setTimeout(() => {
       currentGame.phase = "shop-draft";
-      currentGame.shopCards = currentGame.shopCards?.length
-        ? currentGame.shopCards
-        : makeShopCandidates(currentGame.shopTileDrawCount);
+      dealLocalShopTilesForRound();
       selectedShopCardId = null;
       renderPlayers();
       renderHand();
@@ -860,9 +1101,7 @@ function showShopDraft({ animate = true } = {}) {
   }
 
   currentGame.phase = "shop-draft";
-  currentGame.shopCards = currentGame.shopCards?.length
-    ? currentGame.shopCards
-    : makeShopCandidates(currentGame.shopTileDrawCount);
+  dealLocalShopTilesForRound();
   activateTab("shops");
   renderPlayers();
   renderHand();
@@ -871,6 +1110,7 @@ function showShopDraft({ animate = true } = {}) {
 }
 
 function finishLocalBuildingDraft(keptIds) {
+  const previousLots = currentGame.publicLots || [];
   const discarded = currentGame.buildingCards.filter((id) => !keptIds.includes(id));
   const otherLots = room.players.slice(1).flatMap((player, playerIndex) => (
     discarded.slice(playerIndex * 2, playerIndex * 2 + 2).map((lotId) => ({
@@ -886,6 +1126,7 @@ function finishLocalBuildingDraft(keptIds) {
   currentGame.buildingCards = keptIds;
   currentGame.keptBuildingIds = keptIds;
   currentGame.publicLots = [
+    ...previousLots,
     ...keptIds.map((lotId) => ({
       lotId,
       playerId: selfPlayer.id,
@@ -896,7 +1137,6 @@ function finishLocalBuildingDraft(keptIds) {
   ];
   currentGame.buildingConfirmed = true;
   currentGame.buildingReadyCount = room.playerCount;
-  currentGame.shopCards = makeShopCandidates(currentGame.shopTileDrawCount);
 
   room.players.forEach((player) => {
     player.stats = `${currentGame.buildingKeepCount} 地块 · 0 商铺`;
@@ -998,12 +1238,13 @@ function renderTradeChips(items, setName, labeler) {
   }).join("");
 }
 
-function getPlayerCashLimit() {
-  return 5;
+function getPlayerCashLimit(player = getSelfPlayer()) {
+  return tradeCashLimit;
 }
 
 function renderCashSlider(name, label, max) {
-  const value = tradeDraft[name];
+  const value = Math.min(max, tradeDraft[name]);
+  tradeDraft[name] = value;
   return `
     <label class="trade-cash">
       <span>${label}<b data-cash-value="${name}">${value}万</b></span>
@@ -1188,10 +1429,224 @@ function getShopGroupProgress(lotId) {
   };
 }
 
+function splitBusinessSizes(count, maxSize) {
+  const sizes = [];
+  let remaining = count;
+
+  while (remaining >= maxSize) {
+    sizes.push(maxSize);
+    remaining -= maxSize;
+  }
+
+  if (remaining > 0) {
+    sizes.push(remaining);
+  }
+
+  return sizes;
+}
+
+function getIncomeForBusinessSize(count, maxSize) {
+  if (count >= maxSize) {
+    return incomeTable.complete[maxSize] || 0;
+  }
+
+  return incomeTable.incomplete[count] || 0;
+}
+
+function calculateIncomeRows() {
+  const placedShops = currentGame?.placedShops || {};
+  const visited = new Set();
+  const rows = [];
+
+  Object.keys(placedShops).map(Number).forEach((lotId) => {
+    if (visited.has(lotId)) return;
+
+    const shop = placedShops[lotId];
+    const componentIds = getShopComponentIds(lotId);
+    componentIds.forEach((id) => visited.add(id));
+
+    const sortedLotIds = componentIds.sort((a, b) => a - b);
+    const businessSizes = splitBusinessSizes(sortedLotIds.length, shop.size);
+
+    businessSizes.forEach((businessSize, businessIndex) => {
+      const start = businessIndex * shop.size;
+      const lotIds = sortedLotIds.slice(start, start + businessSize);
+      rows.push({
+        playerId: shop.ownerId,
+        playerName: shop.ownerName,
+        shopId: shop.id,
+        shopName: shop.name,
+        size: businessSize,
+        maxSize: shop.size,
+        complete: businessSize >= shop.size,
+        income: getIncomeForBusinessSize(businessSize, shop.size),
+        lotIds,
+        partIndex: businessIndex + 1,
+        partCount: businessSizes.length,
+      });
+    });
+  });
+
+  return rows;
+}
+
+function applyIncomeSettlement() {
+  if (!currentGame || currentGame.incomeSettled) return;
+
+  currentGame.incomeRows = calculateIncomeRows();
+  room.players.forEach((player) => {
+    const income = getIncomeTotalForPlayer(player.id);
+    player.cash = getPlayerCash(player) + income;
+  });
+  currentGame.incomeSettled = true;
+}
+
+function getIncomeTotalForPlayer(playerId) {
+  return (currentGame?.incomeRows || [])
+    .filter((row) => row.playerId === playerId)
+    .reduce((total, row) => total + row.income, 0);
+}
+
+function renderIncomePanel() {
+  const rows = currentGame.incomeRows || [];
+  const self = getSelfPlayer();
+  const selfRows = rows.filter((row) => row.playerId === self?.id);
+  const total = getIncomeTotalForPlayer(self?.id);
+
+  const header = document.createElement("div");
+  header.className = "income-card wide";
+  header.innerHTML = `
+    <span>收入结算</span>
+    <strong>+${formatMoney(total)}</strong>
+  `;
+  shopGrid.appendChild(header);
+
+  if (!selfRows.length) {
+    const empty = document.createElement("p");
+    empty.className = "income-empty wide";
+    empty.textContent = "你本轮还没有可结算的店铺。";
+    shopGrid.appendChild(empty);
+  }
+
+  selfRows.forEach((row, index) => {
+    const splitLabel = row.partCount > 1 ? ` · 第${row.partIndex}组` : "";
+    const item = document.createElement("article");
+    item.className = `income-row${row.complete ? " complete" : ""}`;
+    item.style.animationDelay = `${index * 90}ms`;
+    item.innerHTML = `
+      <div>
+        <strong>${row.shopName}</strong>
+        <small>${row.complete ? "完成" : "未完成"} · ${row.size}/${row.maxSize}${splitLabel} · 地块 ${row.lotIds.join("、")}</small>
+      </div>
+      <b>+${formatMoney(row.income)}</b>
+    `;
+    shopGrid.appendChild(item);
+  });
+
+  const next = document.createElement("button");
+  next.type = "button";
+  next.className = "confirm-draft shop-confirm";
+  next.textContent = currentGame.round >= 6 ? "同意查看最终结算" : "同意进入下一轮";
+  next.addEventListener("click", agreeToAdvanceAfterIncome);
+  shopGrid.appendChild(next);
+}
+
+function renderFinalPanel() {
+  [...room.players]
+    .sort((a, b) => getPlayerCash(b) - getPlayerCash(a))
+    .forEach((player, index) => {
+      const item = document.createElement("article");
+      item.className = "income-row final";
+      item.innerHTML = `
+        <div>
+          <strong>${index + 1}. ${player.name}</strong>
+          <small>${getPlayerStatsText(player)}</small>
+        </div>
+        <b>${formatMoney(getPlayerCash(player))}</b>
+      `;
+      shopGrid.appendChild(item);
+    });
+}
+
+function confirmShopPlacement() {
+  if (currentGame?.phase !== "shop-draft") return;
+
+  selectedShopCardId = null;
+  currentGame.shopPlacementConfirmed = true;
+  currentGame.shopReadyCount = room.playerCount;
+  currentGame.phase = "income";
+  applyIncomeSettlement();
+  applyPublicLotsToBoard(currentGame.publicLots || []);
+  renderPlayers();
+  renderHand();
+  renderShops();
+  updateDraftSummary();
+  cashLabel.textContent = formatMoney(getPlayerCash(getSelfPlayer()));
+}
+
+function agreeToAdvanceAfterIncome() {
+  if (!currentGame) return;
+
+  currentGame.nextRoundReadyCount = room.playerCount;
+  selectedSummary.textContent = currentGame.round >= 6
+    ? `已同意最终结算 ${currentGame.nextRoundReadyCount}/${room.playerCount}`
+    : `已同意进入下一轮 ${currentGame.nextRoundReadyCount}/${room.playerCount}`;
+  advanceAfterIncome();
+}
+
+function advanceAfterIncome() {
+  if (!currentGame) return;
+
+  if ((currentGame.nextRoundReadyCount || 0) < room.playerCount) {
+    selectedSummary.textContent = `等待其他玩家同意 ${currentGame.nextRoundReadyCount || 0}/${room.playerCount}`;
+    return;
+  }
+
+  if (currentGame.round >= 6) {
+    currentGame.phase = "final";
+    selectedSummary.textContent = "游戏结束 · 最终现金排名";
+    activateTab("shops");
+    renderPlayers();
+    renderHand();
+    renderShops();
+    return;
+  }
+
+  currentGame.round += 1;
+  const rules = getRoundRules(room.playerCount, currentGame.round);
+  currentGame.phase = "building-draft";
+  currentGame.buildingCards = makeBuildingCandidates(rules.buildings.deal);
+  currentGame.keptBuildingIds = [];
+  currentGame.buildingConfirmed = false;
+  currentGame.buildingReadyCount = 0;
+  currentGame.buildingKeepCount = rules.buildings.keep;
+  currentGame.buildingDealCount = rules.buildings.deal;
+  currentGame.shopCards = [...(currentGame.playerShopHands?.[getSelfPlayer()?.id] || currentGame.shopCards || [])];
+  currentGame.shopTileDrawCount = rules.shops;
+  currentGame.incomeRows = [];
+  currentGame.incomeSettled = false;
+  currentGame.nextRoundReadyCount = 0;
+  currentGame.shopPlacementConfirmed = false;
+  currentGame.shopReadyCount = 0;
+  selectedBuildingKeeps = new Set();
+  buildingDraftConfirmed = false;
+  selectedShopCardId = null;
+  clearSelection();
+  applyPublicLotsToBoard(currentGame.publicLots || []);
+  renderPlayers();
+  renderHand();
+  renderShops();
+  roundLabel.textContent = `${currentGame.round}/6轮`;
+  cashLabel.textContent = formatMoney(getPlayerCash(getSelfPlayer()));
+  selectedSummary.textContent = `第${currentGame.round}轮 · 候选 ${currentGame.buildingDealCount} 保留 ${currentGame.buildingKeepCount}`;
+  activateTab("cards");
+}
+
 function removeOneShopCard(shopId) {
   const index = currentGame.shopCards.findIndex((shop) => shop.id === shopId);
   if (index >= 0) {
     currentGame.shopCards.splice(index, 1);
+    syncSelfShopHand();
   }
 }
 
@@ -1357,6 +1812,7 @@ document.querySelector("#startGameButton").addEventListener("click", () => {
 });
 
 document.querySelector("#hintButton").addEventListener("click", () => {
+  renderIncomeHint();
   hintModal.setAttribute("aria-hidden", "false");
 });
 
@@ -1399,7 +1855,7 @@ tradeBody.addEventListener("click", (event) => {
 tradeBody.addEventListener("input", (event) => {
   const cashName = event.target.dataset.cash;
   if (!cashName) return;
-  tradeDraft[cashName] = Math.max(0, Number(event.target.value || 0));
+  tradeDraft[cashName] = Math.max(0, Math.min(tradeCashLimit, Number(event.target.value || 0)));
   const valueLabel = tradeBody.querySelector(`[data-cash-value="${cashName}"]`);
   if (valueLabel) {
     valueLabel.textContent = `${tradeDraft[cashName]}万`;
@@ -1512,7 +1968,7 @@ if (isCoordMode) {
 }
 
 if (isDevMode) {
-  room = makeRoom(3, "DEV1");
+  room = makeRoom(devPlayerCount, "DEV1");
   room.phase = "playing";
   room.starterId = room.players[0].id;
   currentPlayerId = "local-host";
