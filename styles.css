@@ -4,12 +4,14 @@
   --panel: rgba(28, 18, 9, 0.86);
   --panel-2: rgba(55, 36, 18, 0.72);
   --line: rgba(207, 162, 60, 0.34);
-  --gold: #d6a73a;
+  --gold: #ff9d00;
   --paper: #f5e7bf;
   --muted: #a99264;
-  --red: #d94a37;
+  --red: #e04060;
+  --blue: #2f73ff;
   --cyan: #10c9c1;
   --green: #58c06d;
+  --purple: #a470ff;
   --shadow: 0 22px 70px rgba(0, 0, 0, 0.42);
 }
 
@@ -63,6 +65,10 @@ input {
 
 .screen {
   display: none;
+}
+
+.screen:not(.is-active) {
+  display: none !important;
 }
 
 .screen.is-active {
@@ -305,6 +311,10 @@ input {
   box-shadow: none;
 }
 
+.starter-name.blue {
+  box-shadow: none;
+}
+
 .starter-name.cyan {
   box-shadow: none;
 }
@@ -525,19 +535,29 @@ input {
   background: var(--red);
 }
 
+.avatar.blue {
+  color: var(--blue);
+  background: var(--blue);
+}
+
 .avatar.cyan {
   color: var(--cyan);
   background: var(--cyan);
 }
 
 .avatar.gold {
-  color: var(--gold);
-  background: var(--gold);
+  color: var(--blue);
+  background: var(--blue);
 }
 
 .avatar.green {
   color: var(--green);
   background: var(--green);
+}
+
+.avatar.purple {
+  color: var(--purple);
+  background: var(--purple);
 }
 
 .board-panel {
@@ -596,7 +616,7 @@ input {
   aspect-ratio: 2028 / 1404;
   border-radius: 10px;
   overflow: hidden;
-  background: #120b05 url("assets/map.png?v=round-confirm-1") center / 100% 100% no-repeat;
+  background: #120b05 url("assets/map.png?v=color-sync-1") center / 100% 100% no-repeat;
 }
 
 .cell {
@@ -640,14 +660,28 @@ input {
 }
 
 .cell.owner-red {
-  background: rgba(217, 74, 55, 0.2);
-  border-color: rgba(217, 74, 55, 0.92);
+  --owner-fill: rgba(224, 64, 96, 0.21);
+  --owner-stroke: rgba(224, 64, 96, 0.96);
+  background: rgba(224, 64, 96, 0.21);
+  border-color: rgba(224, 64, 96, 0.96);
   color: transparent;
-  box-shadow: 0 0 14px rgba(217, 74, 55, 0.2);
+  box-shadow: 0 0 15px rgba(224, 64, 96, 0.28);
+  font-size: 0;
+}
+
+.cell.owner-blue {
+  --owner-fill: rgba(47, 115, 255, 0.2);
+  --owner-stroke: rgba(87, 148, 255, 0.96);
+  background: rgba(47, 115, 255, 0.2);
+  border-color: rgba(87, 148, 255, 0.96);
+  color: transparent;
+  box-shadow: 0 0 15px rgba(47, 115, 255, 0.3);
   font-size: 0;
 }
 
 .cell.owner-cyan {
+  --owner-fill: rgba(16, 201, 193, 0.2);
+  --owner-stroke: rgba(16, 201, 193, 0.92);
   background: rgba(16, 201, 193, 0.2);
   border-color: rgba(16, 201, 193, 0.92);
   color: transparent;
@@ -656,18 +690,32 @@ input {
 }
 
 .cell.owner-gold {
-  background: rgba(214, 167, 58, 0.2);
-  border-color: rgba(214, 167, 58, 0.94);
+  --owner-fill: rgba(47, 115, 255, 0.2);
+  --owner-stroke: rgba(87, 148, 255, 0.96);
+  background: rgba(47, 115, 255, 0.2);
+  border-color: rgba(87, 148, 255, 0.96);
   color: transparent;
-  box-shadow: 0 0 14px rgba(214, 167, 58, 0.24);
+  box-shadow: 0 0 15px rgba(47, 115, 255, 0.3);
   font-size: 0;
 }
 
 .cell.owner-green {
+  --owner-fill: rgba(88, 192, 109, 0.2);
+  --owner-stroke: rgba(88, 192, 109, 0.92);
   background: rgba(88, 192, 109, 0.2);
   border-color: rgba(88, 192, 109, 0.92);
   color: transparent;
   box-shadow: 0 0 14px rgba(88, 192, 109, 0.24);
+  font-size: 0;
+}
+
+.cell.owner-purple {
+  --owner-fill: rgba(164, 112, 255, 0.22);
+  --owner-stroke: rgba(188, 150, 255, 0.96);
+  background: rgba(164, 112, 255, 0.22);
+  border-color: rgba(188, 150, 255, 0.96);
+  color: transparent;
+  box-shadow: 0 0 16px rgba(164, 112, 255, 0.3);
   font-size: 0;
 }
 
@@ -728,10 +776,17 @@ input {
 }
 
 .cell.shop-group.owner-red {
-  --chain-fill: rgba(217, 74, 55, 0.21);
-  --chain-stroke: rgba(217, 74, 55, 0.62);
-  --chain-glow: rgba(217, 74, 55, 0.12);
-  --chain-text: #7b241c;
+  --chain-fill: rgba(224, 64, 96, 0.22);
+  --chain-stroke: rgba(224, 64, 96, 0.74);
+  --chain-glow: rgba(224, 64, 96, 0.18);
+  --chain-text: #8a1736;
+}
+
+.cell.shop-group.owner-blue {
+  --chain-fill: rgba(47, 115, 255, 0.22);
+  --chain-stroke: rgba(87, 148, 255, 0.76);
+  --chain-glow: rgba(47, 115, 255, 0.2);
+  --chain-text: #173a90;
 }
 
 .cell.shop-group.owner-cyan {
@@ -742,10 +797,10 @@ input {
 }
 
 .cell.shop-group.owner-gold {
-  --chain-fill: rgba(214, 167, 58, 0.22);
-  --chain-stroke: rgba(214, 167, 58, 0.62);
-  --chain-glow: rgba(214, 167, 58, 0.12);
-  --chain-text: #765212;
+  --chain-fill: rgba(47, 115, 255, 0.22);
+  --chain-stroke: rgba(87, 148, 255, 0.76);
+  --chain-glow: rgba(47, 115, 255, 0.2);
+  --chain-text: #173a90;
 }
 
 .cell.shop-group.owner-green {
@@ -753,6 +808,13 @@ input {
   --chain-stroke: rgba(88, 192, 109, 0.62);
   --chain-glow: rgba(88, 192, 109, 0.12);
   --chain-text: #276238;
+}
+
+.cell.shop-group.owner-purple {
+  --chain-fill: rgba(164, 112, 255, 0.23);
+  --chain-stroke: rgba(188, 150, 255, 0.76);
+  --chain-glow: rgba(164, 112, 255, 0.2);
+  --chain-text: #4c2a8a;
 }
 
 .cell.shop-linked-right {
@@ -822,19 +884,27 @@ input {
 }
 
 .cell.can-place-shop {
-  background: rgba(217, 74, 55, 0.14);
-  border-color: rgba(217, 74, 55, 0.92);
-  box-shadow: 0 0 16px rgba(217, 74, 55, 0.32);
+  background: var(--placement-fill, rgba(224, 64, 96, 0.18));
+  border-color: var(--placement-stroke, rgba(224, 64, 96, 0.92));
+  box-shadow: 0 0 16px var(--placement-glow, rgba(224, 64, 96, 0.3));
 }
 
 .cell.is-selected {
-  background: rgba(43, 86, 255, 0.2);
-  border-color: rgba(7, 31, 202, 0.9);
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.92);
   border-radius: 9px;
   color: transparent;
   font-size: 0;
   outline: none;
-  box-shadow: 0 0 16px rgba(7, 31, 202, 0.28);
+  box-shadow:
+    0 0 0 1px rgba(45, 31, 10, 0.16) inset,
+    0 0 16px rgba(255, 255, 255, 0.24);
+}
+
+.cell.is-selected[data-owner] {
+  background: var(--owner-fill, rgba(255, 255, 255, 0.18));
+  border-color: var(--owner-stroke, rgba(255, 255, 255, 0.86));
+  box-shadow: 0 0 16px color-mix(in srgb, var(--owner-stroke, #fff) 34%, transparent);
 }
 
 .cell.is-selected:not([data-owner]) {
@@ -1640,9 +1710,13 @@ input {
 }
 
 .hint-note {
-  margin-top: 10px;
+  margin-top: 14px;
   color: var(--muted);
   font: 12px/1.5 "PingFang SC", sans-serif;
+}
+
+.income-hint-table + .hint-note {
+  margin-top: 16px;
 }
 
 .modal-actions {
@@ -1983,9 +2057,7 @@ input {
   display: grid;
   place-items: center;
   flex: 0 0 auto;
-  min-width: 22px;
   height: 22px;
-  padding: 0 6px;
   border: 1px solid rgba(214, 167, 58, 0.24);
   border-radius: 999px;
   color: var(--paper);
@@ -1993,7 +2065,14 @@ input {
   font: 800 11px/1 "PingFang SC", sans-serif;
 }
 
+.mini-token {
+  width: 30px;
+  padding: 0;
+}
+
 .mini-empty {
+  min-width: 22px;
+  padding: 0 6px;
   color: var(--muted);
   border-style: dashed;
   background: rgba(255, 255, 255, 0.03);

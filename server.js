@@ -9,7 +9,7 @@ const io = new Server(server);
 const PORT = process.env.PORT || 4173;
 const HOST = "0.0.0.0";
 
-const colors = ["red", "cyan", "gold", "green"];
+const colors = ["red", "blue", "cyan", "purple"];
 const rooms = new Map();
 
 const BUILDING_CARD_RULES = {
@@ -140,6 +140,8 @@ function createGame(room) {
     buildingDrafts,
     buildingSelections: {},
     shopDrafts: {},
+    placedShops: {},
+    shopReady: {},
     buildingKeepCount: buildingRule.keep,
     buildingDealCount: buildingRule.deal,
     shopTileDrawCount: SHOP_TILE_RULES[room.playerCount][0],
@@ -148,6 +150,15 @@ function createGame(room) {
 
 function personalGameState(room, playerId) {
   if (!room.game) return null;
+
+  const shopCounts = Object.fromEntries(room.players.map((player) => [
+    player.id,
+    (room.game.shopDrafts[player.id] || []).length,
+  ]));
+  const publicShopHands = Object.fromEntries(room.players.map((player) => [
+    player.id,
+    room.game.shopDrafts[player.id] || [],
+  ]));
 
   return {
     round: room.game.round,
@@ -160,9 +171,26 @@ function personalGameState(room, playerId) {
     buildingDealCount: room.game.buildingDealCount,
     publicLots: publicBuildingLots(room),
     shopCards: room.game.shopDrafts[playerId] || [],
+    publicShopHands,
+    placedShops: room.game.placedShops || {},
+    shopPlacementConfirmed: Boolean(room.game.shopReady?.[playerId]),
+    shopReadyCount: Object.keys(room.game.shopReady || {}).length,
+    playerShopCounts: shopCounts,
     shopTileDrawCount: room.game.shopTileDrawCount,
     deckRemaining: room.game.buildingDeck.length,
   };
+}
+
+function updatePlayerStats(room) {
+  if (!room.game) return;
+
+  room.players.forEach((player) => {
+    const lotCount = (room.game.buildingSelections[player.id] || []).length;
+    const shopCount = Object.values(room.game.placedShops || {})
+      .filter((shop) => shop.ownerId === player.id)
+      .length;
+    player.stats = `${lotCount} 地块 · ${shopCount} 商铺`;
+  });
 }
 
 function emitGameStarted(room) {
@@ -330,10 +358,7 @@ io.on("connection", (socket) => {
 
     room.game.buildingSelections[socket.id] = selected;
 
-    const player = room.players.find((item) => item.id === socket.id);
-    if (player) {
-      player.stats = `${selected.length} 地块 · 0 商铺`;
-    }
+    updatePlayerStats(room);
 
     const allReady = room.players.every((item) => room.game.buildingSelections[item.id]);
 
@@ -349,12 +374,94 @@ io.on("connection", (socket) => {
         if (!rooms.has(room.code) || room.game?.phase !== "building-reveal") return;
 
         room.game.phase = "shop-draft";
+        room.game.shopReady = {};
         room.players.forEach((item) => {
-          room.game.shopDrafts[item.id] = room.game.shopDeck.splice(0, room.game.shopTileDrawCount);
+          const existing = room.game.shopDrafts[item.id] || [];
+          room.game.shopDrafts[item.id] = [
+            ...existing,
+            ...room.game.shopDeck.splice(0, room.game.shopTileDrawCount),
+          ];
         });
         emitGameState(room);
       }, 1800);
     }
+  });
+
+  socket.on("placeShopTile", ({ code, lotId, shopId }, reply) => {
+    const room = rooms.get(String(code || "").trim().toUpperCase());
+
+    if (!room || !room.game) {
+      reply?.({ ok: false, error: "房间不存在。" });
+      return;
+    }
+
+    if (room.game.phase !== "shop-draft") {
+      reply?.({ ok: false, error: "现在不能放置店铺。" });
+      return;
+    }
+
+    if (room.game.shopReady[socket.id]) {
+      reply?.({ ok: false, error: "你已经确认本轮店铺放置。" });
+      return;
+    }
+
+    const targetLotId = Number(lotId);
+    const ownedLots = (room.game.buildingSelections[socket.id] || []).map(Number);
+    if (!ownedLots.includes(targetLotId)) {
+      reply?.({ ok: false, error: "只能放在你自己的地块上。" });
+      return;
+    }
+
+    if (room.game.placedShops[targetLotId]) {
+      reply?.({ ok: false, error: "这个地块已经有店铺。" });
+      return;
+    }
+
+    const hand = room.game.shopDrafts[socket.id] || [];
+    const shopIndex = hand.findIndex((shop) => shop.id === shopId);
+    if (shopIndex < 0) {
+      reply?.({ ok: false, error: "你手上没有这个店铺。" });
+      return;
+    }
+
+    const [shop] = hand.splice(shopIndex, 1);
+    const player = room.players.find((item) => item.id === socket.id);
+    room.game.placedShops[targetLotId] = {
+      id: shop.id,
+      name: shop.name,
+      mark: shop.mark,
+      image: shop.image,
+      size: shop.size,
+      ownerId: socket.id,
+      ownerName: player?.name || "玩家",
+    };
+    updatePlayerStats(room);
+
+    reply?.({ ok: true, room: publicRoom(room), game: personalGameState(room, socket.id) });
+    emitGameState(room);
+  });
+
+  socket.on("confirmShopPlacement", ({ code }, reply) => {
+    const room = rooms.get(String(code || "").trim().toUpperCase());
+
+    if (!room || !room.game) {
+      reply?.({ ok: false, error: "房间不存在。" });
+      return;
+    }
+
+    if (room.game.phase !== "shop-draft") {
+      reply?.({ ok: false, error: "现在不能确认店铺放置。" });
+      return;
+    }
+
+    room.game.shopReady[socket.id] = true;
+    const allReady = room.players.every((item) => room.game.shopReady[item.id]);
+    if (allReady) {
+      room.game.phase = "income";
+    }
+
+    reply?.({ ok: true, room: publicRoom(room), game: personalGameState(room, socket.id) });
+    emitGameState(room);
   });
 
   socket.on("disconnect", () => {

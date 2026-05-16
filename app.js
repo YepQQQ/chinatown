@@ -1,22 +1,54 @@
 const ownerClassByColor = {
   red: "owner-red",
+  blue: "owner-blue",
   cyan: "owner-cyan",
   gold: "owner-gold",
   green: "owner-green",
+  purple: "owner-purple",
 };
 
 const playerPresets = [
   { name: "你", color: "red", stats: "3 地块 · 2 商铺", cash: 5, you: true },
   { name: "阿明", color: "cyan", stats: "3 地块 · 2 商铺", cash: 5 },
-  { name: "小林", color: "gold", stats: "3 地块 · 2 商铺", cash: 5 },
-  { name: "阿青", color: "green", stats: "0 地块 · 0 商铺", cash: 5 },
+  { name: "小林", color: "blue", stats: "3 地块 · 2 商铺", cash: 5 },
+  { name: "阿青", color: "purple", stats: "0 地块 · 0 商铺", cash: 5 },
 ];
 
 const playerRingColors = {
-  red: "rgba(217, 74, 55, 0.82)",
+  red: "rgba(224, 64, 96, 0.84)",
+  blue: "rgba(47, 115, 255, 0.78)",
   cyan: "rgba(16, 201, 193, 0.72)",
-  gold: "rgba(214, 167, 58, 0.78)",
+  gold: "rgba(47, 115, 255, 0.78)",
   green: "rgba(88, 192, 109, 0.72)",
+  purple: "rgba(164, 112, 255, 0.78)",
+};
+
+const placementPalettes = {
+  red: {
+    fill: "rgba(224, 64, 96, 0.22)",
+    stroke: "rgba(224, 64, 96, 0.98)",
+    glow: "rgba(224, 64, 96, 0.32)",
+  },
+  blue: {
+    fill: "rgba(47, 115, 255, 0.22)",
+    stroke: "rgba(87, 148, 255, 0.98)",
+    glow: "rgba(47, 115, 255, 0.34)",
+  },
+  cyan: {
+    fill: "rgba(16, 201, 193, 0.2)",
+    stroke: "rgba(30, 224, 214, 0.96)",
+    glow: "rgba(16, 201, 193, 0.3)",
+  },
+  purple: {
+    fill: "rgba(164, 112, 255, 0.22)",
+    stroke: "rgba(188, 150, 255, 0.98)",
+    glow: "rgba(164, 112, 255, 0.32)",
+  },
+  gold: {
+    fill: "rgba(47, 115, 255, 0.22)",
+    stroke: "rgba(87, 148, 255, 0.98)",
+    glow: "rgba(47, 115, 255, 0.34)",
+  },
 };
 
 const MAP_WIDTH = 2028;
@@ -405,6 +437,10 @@ function renderBoard() {
   lotsByPosition = new Map(lots.map((lot) => [`${lot.x},${lot.y}`, lot]));
   const canPreviewPlacement = currentGame?.phase === "shop-draft" && selectedShopCardId;
   const selfPlayer = getSelfPlayer();
+  const placementPalette = placementPalettes[selfPlayer?.color] || placementPalettes.red;
+  board.style.setProperty("--placement-fill", placementPalette.fill);
+  board.style.setProperty("--placement-stroke", placementPalette.stroke);
+  board.style.setProperty("--placement-glow", placementPalette.glow);
   board.classList.toggle("is-placing-shop", Boolean(canPreviewPlacement));
 
   lots.forEach((lot) => {
@@ -563,7 +599,15 @@ function getPlayerHandShops(player) {
     return currentGame.shopCards?.length ? currentGame.shopCards : (currentGame.playerShopHands?.[player.id] || null);
   }
 
+  if (currentGame.publicShopHands?.[player.id]) {
+    return currentGame.publicShopHands[player.id];
+  }
+
   return currentGame.playerShopHands?.[player.id] || null;
+}
+
+function hasShopPhaseStarted() {
+  return ["shop-draft", "income", "final"].includes(currentGame?.phase);
 }
 
 function renderMiniTokens(values, emptyText) {
@@ -577,6 +621,15 @@ function renderMiniTokens(values, emptyText) {
 function renderPlayerShopTokens(player) {
   const shops = getPlayerHandShops(player);
   if (shops === null) {
+    const hiddenCount = currentGame?.playerShopCounts?.[player.id] || 0;
+    if (hiddenCount > 0) {
+      return `<span class="mini-empty">店铺 ${hiddenCount} 张（保密）</span>`;
+    }
+
+    if (hasShopPhaseStarted()) {
+      return `<span class="mini-empty">手上暂无店铺</span>`;
+    }
+
     return `<span class="mini-empty">店铺尚未发放</span>`;
   }
 
@@ -591,6 +644,17 @@ function renderPlayerShopTokens(player) {
       <b>${shop.count}</b>
     </span>
   `).join("");
+}
+
+function getPublicPlayerShopCards(player) {
+  if (!player) return [];
+
+  const self = getSelfPlayer();
+  if (player.id === self?.id || player.you) {
+    return currentGame?.shopCards || [];
+  }
+
+  return currentGame?.publicShopHands?.[player.id] || currentGame?.playerShopHands?.[player.id] || [];
 }
 
 function renderIncomeHint() {
@@ -629,7 +693,7 @@ function renderIncomeHint() {
         </tr>
       </tbody>
     </table>
-    <p class="hint-note">完成表示同类店铺连接数量达到店铺图标上的最大规模。玩家现金按规则保密。</p>
+    <p class="hint-note">完成表示同类店铺连接数量达到店铺图标上的最大规模。</p>
   `;
 }
 
@@ -892,7 +956,9 @@ function updateDraftSummary() {
     const shopCount = Array.isArray(currentGame.shopCards)
       ? currentGame.shopCards.length
       : currentGame.shopTileDrawCount;
-    selectedSummary.textContent = selectedShopCardId
+    selectedSummary.textContent = currentGame.shopPlacementConfirmed
+      ? `已确认店铺 · 等待 ${currentGame.shopReadyCount || 1}/${room.playerCount}`
+      : selectedShopCardId
       ? "选择自己的空地块放置店铺"
       : `店铺 ${shopCount} 张 · 先选店铺`;
     return;
@@ -1060,7 +1126,10 @@ function renderShopPlacementAction() {
   const remaining = currentGame.shopCards?.length || 0;
   action.type = "button";
   action.className = "confirm-draft shop-confirm";
-  action.textContent = remaining ? `进入下一轮 · 保留 ${remaining} 张` : "进入下一轮";
+  action.disabled = Boolean(currentGame.shopPlacementConfirmed);
+  action.textContent = currentGame.shopPlacementConfirmed
+    ? `已确认 · 等待 ${currentGame.shopReadyCount || 1}/${room.playerCount}`
+    : remaining ? `进入下一轮 · 保留 ${remaining} 张` : "进入下一轮";
   action.addEventListener("click", confirmShopPlacement);
   shopGrid.appendChild(action);
 }
@@ -1256,7 +1325,19 @@ function confirmBuildingDraft() {
 }
 
 function getSelfPlayer() {
-  return room?.players.find((player) => player.id === currentPlayerId || player.you) || room?.players[0];
+  const players = room?.players || [];
+  const exact = players.find((player) => player.id === currentPlayerId);
+  if (exact) return exact;
+
+  if (socket?.id) {
+    const socketPlayer = players.find((player) => player.id === socket.id);
+    if (socketPlayer) {
+      currentPlayerId = socket.id;
+      return socketPlayer;
+    }
+  }
+
+  return players.find((player) => player.you) || players[0];
 }
 
 function getTradeTargets() {
@@ -1280,7 +1361,7 @@ function toggleTradeSet(setName, value) {
   } else {
     targetSet.add(value);
   }
-  renderTradeModal();
+  return targetSet.has(value);
 }
 
 function renderTradeChips(items, setName, labeler) {
@@ -1362,7 +1443,7 @@ function renderTradeModal() {
     .filter((item) => item.playerId === target?.id || item.name === target?.name)
     .map((item) => ({ value: item.lotId, text: `${item.lotId}` }));
   const ownShops = groupShopCards(currentGame?.shopCards || []);
-  const requestShops = shopCatalog.map((shop) => ({ ...shop, count: shop.size + 3 }));
+  const requestShops = groupShopCards(getPublicPlayerShopCards(target));
 
   tradeBody.innerHTML = `
     <div class="trade-targets">
@@ -1387,7 +1468,7 @@ function renderTradeModal() {
         ${renderCashSlider("requestCash", "现金", targetCashLimit)}
         <h4>${target?.name || "对方"}的地块</h4>
         <div class="trade-chip-grid">${renderTradeChips(targetLots, "requestLots", (item) => item.text)}</div>
-        <h4>店铺</h4>
+        <h4>${target?.name || "对方"}的店铺</h4>
         <div class="trade-shop-grid">${renderTradeShopStacks(requestShops, "requestShops")}</div>
       </section>
     </div>
@@ -1430,11 +1511,15 @@ function getSelectedShopCard() {
 }
 
 function getLotPublicOwner(lotId) {
-  return (currentGame?.publicLots || []).find((item) => item.lotId === lotId);
+  return (currentGame?.publicLots || []).find((item) => Number(item.lotId) === Number(lotId));
 }
 
 function ownsLot(player, lotOwner) {
-  return Boolean(player && lotOwner && (lotOwner.playerId === player.id || lotOwner.name === player.name));
+  return Boolean(player && lotOwner && (
+    String(lotOwner.playerId) === String(player.id)
+    || String(lotOwner.playerId) === String(currentPlayerId)
+    || lotOwner.name === player.name
+  ));
 }
 
 function canPlaceShopOnLot(lotId) {
@@ -1632,6 +1717,33 @@ function confirmShopPlacement() {
 function finalizeShopPlacementAndShowIncome() {
   if (currentGame?.phase !== "shop-draft") return;
 
+  if (socket && room?.code && !isDevMode) {
+    closeHintModal();
+    socket.emit("confirmShopPlacement", { code: room.code }, (reply) => {
+      if (!reply?.ok) {
+        selectedSummary.textContent = reply?.error || "确认店铺放置失败。";
+        return;
+      }
+
+      room = reply.room;
+      currentGame = reply.game;
+      selectedShopCardId = null;
+      applyPublicLotsToBoard(currentGame.publicLots || []);
+      if (currentGame.phase === "income") {
+        applyIncomeSettlement();
+      }
+      renderPlayers();
+      renderHand();
+      renderShops();
+      updateDraftSummary();
+      if (currentGame.phase === "income") {
+        cashLabel.textContent = formatMoney(getPlayerCash(getSelfPlayer()));
+        renderIncomeSettlementModal();
+      }
+    });
+    return;
+  }
+
   selectedShopCardId = null;
   currentGame.shopPlacementConfirmed = true;
   currentGame.shopReadyCount = room.playerCount;
@@ -1721,6 +1833,29 @@ function placeSelectedShop(lotId) {
   }
 
   const { shop, owner } = result;
+  if (socket && room?.code && !isDevMode) {
+    socket.emit("placeShopTile", { code: room.code, lotId, shopId: shop.id }, (reply) => {
+      if (!reply?.ok) {
+        selectedSummary.textContent = reply?.error || "放置店铺失败。";
+        return;
+      }
+
+      room = reply.room;
+      currentGame = reply.game;
+      selectedShopCardId = (currentGame.shopCards || []).some((item) => item.id === shop.id) ? shop.id : null;
+      applyPublicLotsToBoard(currentGame.publicLots || []);
+      renderPlayers();
+      renderShops();
+      updateDraftSummary();
+      activateTab("shops");
+      const progress = getShopGroupProgress(lotId);
+      selectedSummary.textContent = progress
+        ? `${lotId}号放置${shop.name} · 规模 ${progress.current}/${progress.max}`
+        : `${lotId}号放置${shop.name}`;
+    });
+    return true;
+  }
+
   currentGame.placedShops ||= {};
   currentGame.placedShops[lotId] = {
     id: shop.id,
@@ -1890,6 +2025,7 @@ document.querySelector("#startTradeButton").addEventListener("click", () => {
 tradeBody.addEventListener("click", (event) => {
   const targetButton = event.target.closest("[data-target]");
   if (targetButton) {
+    event.preventDefault();
     tradeDraft.targetId = targetButton.dataset.target;
     tradeDraft.requestLots.clear();
     tradeDraft.requestShops.clear();
@@ -1899,6 +2035,7 @@ tradeBody.addEventListener("click", (event) => {
 
   const shopButton = event.target.closest("[data-shop-step]");
   if (shopButton) {
+    event.preventDefault();
     adjustTradeShop(
       shopButton.dataset.map,
       shopButton.dataset.shopId,
@@ -1911,7 +2048,9 @@ tradeBody.addEventListener("click", (event) => {
 
   const chip = event.target.closest("[data-set]");
   if (chip) {
-    toggleTradeSet(chip.dataset.set, chip.dataset.value);
+    event.preventDefault();
+    const selected = toggleTradeSet(chip.dataset.set, chip.dataset.value);
+    chip.classList.toggle("is-selected", selected);
   }
 });
 
@@ -2001,9 +2140,13 @@ if (socket) {
     currentGame = payload.game;
     selectedBuildingKeeps = new Set(currentGame.keptBuildingIds || []);
     buildingDraftConfirmed = Boolean(currentGame.buildingConfirmed);
+    if (selectedShopCardId && !(currentGame.shopCards || []).some((shop) => shop.id === selectedShopCardId)) {
+      selectedShopCardId = null;
+    }
 
     if (currentGame.phase === "building-reveal") {
       applyPublicLotsToBoard(currentGame.publicLots || []);
+      activateTab("cards");
       renderPlayers();
       renderHand();
       renderShops();
@@ -2013,7 +2156,24 @@ if (socket) {
 
     if (!["shop-draft", "shop-dealing"].includes(previousPhase) && currentGame.phase === "shop-draft") {
       applyPublicLotsToBoard(currentGame.publicLots || []);
-      showShopDraft({ animate: true });
+      selectedShopCardId = null;
+      activateTab("shops");
+      renderPlayers();
+      renderHand();
+      renderShops();
+      updateDraftSummary();
+      return;
+    }
+
+    if (currentGame.phase === "income" && previousPhase !== "income") {
+      applyPublicLotsToBoard(currentGame.publicLots || []);
+      applyIncomeSettlement();
+      renderPlayers();
+      renderHand();
+      renderShops();
+      updateDraftSummary();
+      cashLabel.textContent = formatMoney(getPlayerCash(getSelfPlayer()));
+      renderIncomeSettlementModal();
       return;
     }
 
