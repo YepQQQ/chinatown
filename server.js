@@ -11,6 +11,7 @@ const HOST = "0.0.0.0";
 
 const colors = ["red", "blue", "cyan", "purple"];
 const rooms = new Map();
+const fallbackNames = ["阿明", "小林", "阿青", "阿豪", "小唐", "阿珍", "老陈", "阿远"];
 
 const BUILDING_CARD_RULES = {
   3: [
@@ -51,6 +52,49 @@ const SHOP_TYPES = [
   { id: "seafood", name: "海鲜店", mark: "鲜", size: 3, image: "assets/shop-icons/海鲜店.png" },
 ];
 
+const INCOME_TABLE = {
+  incomplete: { 1: 1, 2: 2, 3: 4, 4: 6, 5: 8 },
+  complete: { 3: 5, 4: 8, 5: 11, 6: 14 },
+};
+
+function lot(id, x, y, w, h) {
+  return { id, x, y, w, h, cx: x + w / 2, cy: y + h / 2 };
+}
+
+const LOT_LAYOUT = [
+  lot(1, 310, 245, 78, 78), lot(2, 420, 245, 78, 78),
+  lot(3, 310, 355, 78, 78), lot(4, 420, 355, 78, 78), lot(5, 530, 355, 78, 78),
+  lot(6, 200, 465, 78, 78), lot(7, 310, 465, 78, 78), lot(8, 420, 465, 78, 78), lot(9, 530, 465, 78, 78),
+  lot(10, 200, 575, 78, 78), lot(11, 310, 575, 78, 78), lot(12, 420, 575, 78, 78),
+  lot(13, 200, 685, 78, 78), lot(14, 310, 685, 78, 78), lot(15, 420, 685, 78, 78),
+  lot(16, 688, 245, 78, 78), lot(17, 798, 245, 78, 78), lot(18, 908, 245, 78, 78),
+  lot(19, 688, 355, 78, 78), lot(20, 798, 355, 78, 78), lot(21, 908, 355, 78, 78),
+  lot(22, 688, 465, 78, 78), lot(23, 798, 465, 78, 78),
+  lot(24, 688, 575, 78, 78), lot(25, 798, 575, 78, 78),
+  lot(26, 688, 685, 78, 78), lot(27, 798, 685, 78, 78),
+  lot(28, 1081, 245, 78, 78), lot(29, 1191, 245, 78, 78), lot(30, 1301, 245, 78, 78),
+  lot(31, 1081, 355, 78, 78), lot(32, 1191, 355, 78, 78), lot(33, 1301, 355, 78, 78),
+  lot(34, 1081, 465, 78, 78), lot(35, 1191, 465, 78, 78), lot(36, 1301, 465, 78, 78),
+  lot(37, 1191, 575, 78, 78), lot(38, 1301, 575, 78, 78), lot(39, 1411, 575, 78, 78),
+  lot(40, 1191, 685, 78, 78), lot(41, 1301, 685, 78, 78), lot(42, 1411, 685, 78, 78),
+  lot(43, 1564, 247, 78, 78), lot(44, 1666, 247, 78, 78), lot(45, 1774, 247, 78, 78), lot(46, 1876, 247, 78, 78),
+  lot(47, 1564, 357, 78, 78), lot(48, 1666, 357, 78, 78), lot(49, 1774, 357, 78, 78), lot(50, 1876, 357, 78, 78),
+  lot(51, 1564, 467, 78, 78), lot(52, 1666, 467, 78, 78), lot(53, 1774, 467, 78, 78), lot(54, 1876, 467, 78, 78),
+  lot(55, 1774, 579, 78, 78), lot(56, 1876, 579, 78, 78),
+  lot(57, 1774, 685, 78, 78), lot(58, 1876, 685, 78, 78),
+  lot(59, 794, 836, 78, 78), lot(60, 904, 836, 78, 78),
+  lot(61, 794, 932, 78, 78), lot(62, 904, 932, 78, 78),
+  lot(63, 794, 1026, 78, 78), lot(64, 904, 1026, 78, 78), lot(65, 1016, 1026, 78, 78),
+  lot(66, 794, 1122, 78, 78), lot(67, 904, 1122, 78, 78), lot(68, 1016, 1122, 78, 78),
+  lot(69, 904, 1216, 78, 78), lot(70, 1016, 1216, 78, 78),
+  lot(71, 1327, 836, 78, 78), lot(72, 1437, 836, 78, 78), lot(73, 1549, 836, 78, 78), lot(74, 1659, 836, 78, 78),
+  lot(75, 1327, 932, 78, 78), lot(76, 1437, 932, 78, 78), lot(77, 1549, 932, 78, 78), lot(78, 1659, 932, 78, 78),
+  lot(79, 1327, 1026, 78, 78), lot(80, 1437, 1026, 78, 78), lot(81, 1549, 1026, 78, 78), lot(82, 1659, 1026, 78, 78),
+  lot(83, 1327, 1122, 78, 78), lot(84, 1437, 1122, 78, 78), lot(85, 1549, 1122, 78, 78),
+];
+
+const LOTS_BY_ID = new Map(LOT_LAYOUT.map((item) => [item.id, item]));
+
 app.use(express.static(__dirname));
 
 function getLanUrls() {
@@ -89,6 +133,7 @@ function publicRoom(room) {
       name: player.name,
       color: player.color,
       stats: player.stats,
+      connected: player.connected !== false,
     })),
   };
 }
@@ -104,23 +149,233 @@ function shuffle(items) {
   return result;
 }
 
+function makeFallbackName(room) {
+  const usedNames = new Set(room?.players?.map((player) => player.name) || []);
+  const available = fallbackNames.filter((name) => !usedNames.has(name));
+  const pool = available.length ? available : fallbackNames;
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+
+function normalizePlayerName(nickname, room) {
+  const name = String(nickname || "").trim().slice(0, 8);
+  const usedNames = new Set(room?.players?.map((player) => player.name) || []);
+  if (!name || name === "你" || name === "玩家" || usedNames.has(name)) return makeFallbackName(room);
+  return name;
+}
+
 function createShopDeck() {
-  return shuffle(SHOP_TYPES.flatMap((shop) => (
-    Array.from({ length: shop.size + 3 }, (_, index) => ({ ...shop, cardId: `${shop.id}-${index + 1}` }))
-  )));
+  const remaining = new Map(SHOP_TYPES.map((shop) => [shop.id, shop.size + 3]));
+  const deck = [];
+  let previousShopId = null;
+
+  while (deck.length < SHOP_TYPES.reduce((total, shop) => total + shop.size + 3, 0)) {
+    const availableShops = SHOP_TYPES.filter((shop) => (remaining.get(shop.id) || 0) > 0);
+    const repeatShop = availableShops.find((shop) => shop.id === previousShopId);
+    const shouldRepeat = repeatShop && Math.random() < 0.34;
+    const shop = shouldRepeat
+      ? repeatShop
+      : availableShops[Math.floor(Math.random() * availableShops.length)];
+    const nextCount = remaining.get(shop.id) - 1;
+    const copyNumber = shop.size + 3 - nextCount;
+    remaining.set(shop.id, nextCount);
+    deck.push({ ...shop, cardId: `${shop.id}-${copyNumber}` });
+    previousShopId = shop.id;
+  }
+
+  return deck;
 }
 
 function publicBuildingLots(room) {
   if (!room.game) return [];
 
   return room.players.flatMap((player) => (
-    (room.game.buildingSelections[player.id] || []).map((lotId) => ({
+    (room.game.ownedLots[player.id] || []).map((lotId) => ({
       lotId,
       playerId: player.id,
       name: player.name,
       color: player.color,
     }))
   ));
+}
+
+function moveGameMapEntry(target, oldId, newId) {
+  if (!target || !Object.prototype.hasOwnProperty.call(target, oldId)) return;
+  target[newId] = target[oldId];
+  delete target[oldId];
+}
+
+function transferPlayerSocket(room, oldId, newSocket) {
+  const player = room.players.find((item) => item.id === oldId);
+  if (!player) return null;
+
+  const newId = newSocket.id;
+  player.id = newId;
+  player.connected = true;
+
+  if (room.hostId === oldId) {
+    room.hostId = newId;
+  }
+
+  if (room.game) {
+    moveGameMapEntry(room.game.ownedLots, oldId, newId);
+    moveGameMapEntry(room.game.buildingDrafts, oldId, newId);
+    moveGameMapEntry(room.game.buildingSelections, oldId, newId);
+    moveGameMapEntry(room.game.buildingReady, oldId, newId);
+    moveGameMapEntry(room.game.shopDrafts, oldId, newId);
+    moveGameMapEntry(room.game.shopReady, oldId, newId);
+    moveGameMapEntry(room.game.nextRoundReady, oldId, newId);
+    Object.values(room.game.placedShops || {}).forEach((shop) => {
+      if (shop.ownerId === oldId) shop.ownerId = newId;
+    });
+  }
+
+  newSocket.join(room.code);
+  newSocket.data.roomCode = room.code;
+  return player;
+}
+
+function overlapLength(startA, endA, startB, endB) {
+  return Math.max(0, Math.min(endA, endB) - Math.max(startA, startB));
+}
+
+function getNeighbors(targetLot) {
+  const edgeTolerance = 36;
+  return LOT_LAYOUT.filter((candidate) => {
+    if (candidate.id === targetLot.id) return false;
+
+    const horizontalGap = Math.min(
+      Math.abs(candidate.x - (targetLot.x + targetLot.w)),
+      Math.abs(targetLot.x - (candidate.x + candidate.w)),
+    );
+    const verticalGap = Math.min(
+      Math.abs(candidate.y - (targetLot.y + targetLot.h)),
+      Math.abs(targetLot.y - (candidate.y + candidate.h)),
+    );
+    const verticalOverlap = overlapLength(targetLot.y, targetLot.y + targetLot.h, candidate.y, candidate.y + candidate.h);
+    const horizontalOverlap = overlapLength(targetLot.x, targetLot.x + targetLot.w, candidate.x, candidate.x + candidate.w);
+    const horizontalTouch = horizontalGap <= edgeTolerance && verticalOverlap > targetLot.h * 0.6;
+    const verticalTouch = verticalGap <= edgeTolerance && horizontalOverlap > targetLot.w * 0.6;
+    return horizontalTouch || verticalTouch;
+  });
+}
+
+function getShopComponentIds(game, lotId) {
+  const placedShop = game.placedShops?.[lotId];
+  if (!placedShop) return [];
+
+  const visited = new Set();
+  const queue = [Number(lotId)];
+
+  while (queue.length) {
+    const nextId = queue.shift();
+    if (visited.has(nextId)) continue;
+
+    const nextShop = game.placedShops?.[nextId];
+    if (!nextShop) continue;
+    if (nextShop.id !== placedShop.id || nextShop.ownerId !== placedShop.ownerId) continue;
+
+    visited.add(nextId);
+    const lotItem = LOTS_BY_ID.get(nextId);
+    if (!lotItem) continue;
+
+    getNeighbors(lotItem).forEach((neighbor) => {
+      if (!visited.has(neighbor.id)) queue.push(neighbor.id);
+    });
+  }
+
+  return [...visited];
+}
+
+function splitBusinessSizes(count, maxSize) {
+  const sizes = [];
+  let remaining = count;
+
+  while (remaining >= maxSize) {
+    sizes.push(maxSize);
+    remaining -= maxSize;
+  }
+
+  if (remaining > 0) sizes.push(remaining);
+  return sizes;
+}
+
+function getIncomeForBusinessSize(count, maxSize) {
+  return count >= maxSize
+    ? INCOME_TABLE.complete[maxSize] || 0
+    : INCOME_TABLE.incomplete[count] || 0;
+}
+
+function calculateIncomeRows(game) {
+  const visited = new Set();
+  const rows = [];
+
+  Object.keys(game.placedShops || {}).map(Number).forEach((lotId) => {
+    if (visited.has(lotId)) return;
+
+    const shop = game.placedShops[lotId];
+    const componentIds = getShopComponentIds(game, lotId);
+    componentIds.forEach((id) => visited.add(id));
+
+    const sortedLotIds = componentIds.sort((a, b) => a - b);
+    const businessSizes = splitBusinessSizes(sortedLotIds.length, shop.size);
+
+    businessSizes.forEach((businessSize, businessIndex) => {
+      const start = businessIndex * shop.size;
+      const lotIds = sortedLotIds.slice(start, start + businessSize);
+      rows.push({
+        playerId: shop.ownerId,
+        playerName: shop.ownerName,
+        shopId: shop.id,
+        shopName: shop.name,
+        size: businessSize,
+        maxSize: shop.size,
+        complete: businessSize >= shop.size,
+        income: getIncomeForBusinessSize(businessSize, shop.size),
+        lotIds,
+        partIndex: businessIndex + 1,
+        partCount: businessSizes.length,
+      });
+    });
+  });
+
+  return rows;
+}
+
+function settleIncome(room) {
+  if (!room.game || room.game.incomeSettled) return;
+
+  const rows = calculateIncomeRows(room.game);
+  room.game.incomeRows = rows;
+  room.players.forEach((player) => {
+    const income = rows
+      .filter((row) => row.playerId === player.id)
+      .reduce((total, row) => total + row.income, 0);
+    player.cash = (player.cash ?? 5) + income;
+  });
+  room.game.incomeSettled = true;
+}
+
+function advanceToNextRound(room) {
+  const game = room.game;
+  game.round += 1;
+  const buildingRule = BUILDING_CARD_RULES[room.playerCount][game.round - 1];
+  const shopRule = SHOP_TILE_RULES[room.playerCount][game.round - 1];
+
+  game.phase = "building-draft";
+  game.buildingDrafts = {};
+  game.buildingSelections = {};
+  game.buildingReady = {};
+  game.shopReady = {};
+  game.nextRoundReady = {};
+  game.incomeRows = [];
+  game.incomeSettled = false;
+  game.buildingKeepCount = buildingRule.keep;
+  game.buildingDealCount = buildingRule.deal;
+  game.shopTileDrawCount = shopRule;
+
+  room.players.forEach((player) => {
+    game.buildingDrafts[player.id] = game.buildingDeck.splice(0, buildingRule.deal).sort((a, b) => a - b);
+  });
 }
 
 function createGame(room) {
@@ -138,10 +393,15 @@ function createGame(room) {
     buildingDeck,
     shopDeck: createShopDeck(),
     buildingDrafts,
+    ownedLots: Object.fromEntries(room.players.map((player) => [player.id, []])),
     buildingSelections: {},
+    buildingReady: {},
     shopDrafts: {},
     placedShops: {},
     shopReady: {},
+    nextRoundReady: {},
+    incomeRows: [],
+    incomeSettled: false,
     buildingKeepCount: buildingRule.keep,
     buildingDealCount: buildingRule.deal,
     shopTileDrawCount: SHOP_TILE_RULES[room.playerCount][0],
@@ -165,17 +425,23 @@ function personalGameState(room, playerId) {
     phase: room.game.phase,
     buildingCards: room.game.buildingSelections[playerId] || room.game.buildingDrafts[playerId] || [],
     keptBuildingIds: room.game.buildingSelections[playerId] || [],
-    buildingConfirmed: Boolean(room.game.buildingSelections[playerId]),
-    buildingReadyCount: Object.keys(room.game.buildingSelections).length,
+    buildingConfirmed: Boolean(room.game.buildingReady?.[playerId]),
+    buildingReadyCount: Object.keys(room.game.buildingReady || {}).length,
     buildingKeepCount: room.game.buildingKeepCount,
     buildingDealCount: room.game.buildingDealCount,
     publicLots: publicBuildingLots(room),
+    ownLotIds: room.game.ownedLots[playerId] || [],
     shopCards: room.game.shopDrafts[playerId] || [],
     publicShopHands,
     placedShops: room.game.placedShops || {},
     shopPlacementConfirmed: Boolean(room.game.shopReady?.[playerId]),
     shopReadyCount: Object.keys(room.game.shopReady || {}).length,
+    nextRoundConfirmed: Boolean(room.game.nextRoundReady?.[playerId]),
+    nextRoundReadyCount: Object.keys(room.game.nextRoundReady || {}).length,
     playerShopCounts: shopCounts,
+    cash: room.players.find((player) => player.id === playerId)?.cash ?? 5,
+    incomeRows: room.game.incomeRows || [],
+    incomeSettled: Boolean(room.game.incomeSettled),
     shopTileDrawCount: room.game.shopTileDrawCount,
     deckRemaining: room.game.buildingDeck.length,
   };
@@ -185,7 +451,7 @@ function updatePlayerStats(room) {
   if (!room.game) return;
 
   room.players.forEach((player) => {
-    const lotCount = (room.game.buildingSelections[player.id] || []).length;
+    const lotCount = (room.game.ownedLots[player.id] || []).length;
     const shopCount = Object.values(room.game.placedShops || {})
       .filter((shop) => shop.ownerId === player.id)
       .length;
@@ -225,6 +491,15 @@ function leaveCurrentRoom(socket) {
 
   if (!room) return;
 
+  if (room.phase !== "waiting" && room.game) {
+    const player = room.players.find((item) => item.id === socket.id);
+    if (player) {
+      player.connected = false;
+      emitRoom(room);
+    }
+    return;
+  }
+
   room.players = room.players.filter((player) => player.id !== socket.id);
 
   if (room.players.length === 0) {
@@ -240,6 +515,32 @@ function leaveCurrentRoom(socket) {
 }
 
 io.on("connection", (socket) => {
+  socket.on("resumeRoom", ({ code, playerId }, reply) => {
+    const room = rooms.get(String(code || "").trim().toUpperCase());
+    const oldId = String(playerId || "");
+
+    if (!room || !oldId) {
+      reply?.({ ok: false, error: "无法恢复房间。" });
+      return;
+    }
+
+    const player = transferPlayerSocket(room, oldId, socket);
+    if (!player) {
+      reply?.({ ok: false, error: "没有找到原来的玩家。" });
+      return;
+    }
+
+    const payload = {
+      ok: true,
+      selfId: socket.id,
+      room: publicRoom(room),
+      game: personalGameState(room, socket.id),
+    };
+    reply?.(payload);
+    emitRoom(room);
+    emitGameState(room);
+  });
+
   socket.on("createRoom", ({ nickname, playerCount }, reply) => {
     leaveCurrentRoom(socket);
 
@@ -264,6 +565,7 @@ io.on("connection", (socket) => {
         },
       ],
     };
+    room.players[0].name = normalizePlayerName(nickname, room);
 
     rooms.set(code, room);
     socket.join(code);
@@ -296,7 +598,7 @@ io.on("connection", (socket) => {
 
     room.players.push({
       id: socket.id,
-      name: String(nickname || "玩家").slice(0, 8),
+      name: normalizePlayerName(nickname, room),
       color: colors[room.players.length],
       stats: "0 地块 · 0 商铺",
     });
@@ -328,6 +630,9 @@ io.on("connection", (socket) => {
 
     room.phase = "playing";
     room.starterId = room.players[Math.floor(Math.random() * room.players.length)].id;
+    room.players.forEach((player) => {
+      player.cash = 5;
+    });
     room.game = createGame(room);
     reply?.({ ok: true, room: publicRoom(room), game: personalGameState(room, socket.id) });
     emitGameStarted(room);
@@ -357,17 +662,26 @@ io.on("connection", (socket) => {
     }
 
     room.game.buildingSelections[socket.id] = selected;
+    room.game.buildingReady[socket.id] = true;
 
-    updatePlayerStats(room);
-
-    const allReady = room.players.every((item) => room.game.buildingSelections[item.id]);
+    const allReady = room.players.every((item) => room.game.buildingReady[item.id]);
 
     if (allReady) {
+      room.players.forEach((player) => {
+        const owned = new Set(room.game.ownedLots[player.id] || []);
+        (room.game.buildingSelections[player.id] || []).forEach((lotId) => owned.add(lotId));
+        room.game.ownedLots[player.id] = [...owned].sort((a, b) => a - b);
+      });
+      updatePlayerStats(room);
       room.game.phase = "building-reveal";
     }
 
     reply?.({ ok: true, room: publicRoom(room), game: personalGameState(room, socket.id) });
-    emitGameState(room);
+    if (allReady) {
+      emitGameState(room);
+    } else {
+      emitRoom(room);
+    }
 
     if (allReady) {
       setTimeout(() => {
@@ -406,7 +720,7 @@ io.on("connection", (socket) => {
     }
 
     const targetLotId = Number(lotId);
-    const ownedLots = (room.game.buildingSelections[socket.id] || []).map(Number);
+    const ownedLots = (room.game.ownedLots[socket.id] || []).map(Number);
     if (!ownedLots.includes(targetLotId)) {
       reply?.({ ok: false, error: "只能放在你自己的地块上。" });
       return;
@@ -438,7 +752,7 @@ io.on("connection", (socket) => {
     updatePlayerStats(room);
 
     reply?.({ ok: true, room: publicRoom(room), game: personalGameState(room, socket.id) });
-    emitGameState(room);
+    emitRoom(room);
   });
 
   socket.on("confirmShopPlacement", ({ code }, reply) => {
@@ -457,11 +771,48 @@ io.on("connection", (socket) => {
     room.game.shopReady[socket.id] = true;
     const allReady = room.players.every((item) => room.game.shopReady[item.id]);
     if (allReady) {
+      settleIncome(room);
       room.game.phase = "income";
     }
 
     reply?.({ ok: true, room: publicRoom(room), game: personalGameState(room, socket.id) });
-    emitGameState(room);
+    if (allReady) {
+      emitGameState(room);
+    } else {
+      emitRoom(room);
+    }
+  });
+
+  socket.on("agreeNextRound", ({ code }, reply) => {
+    const room = rooms.get(String(code || "").trim().toUpperCase());
+
+    if (!room || !room.game) {
+      reply?.({ ok: false, error: "房间不存在。" });
+      return;
+    }
+
+    if (room.game.phase !== "income") {
+      reply?.({ ok: false, error: "现在还不能进入下一轮。" });
+      return;
+    }
+
+    room.game.nextRoundReady[socket.id] = true;
+    const allReady = room.players.every((item) => room.game.nextRoundReady[item.id]);
+
+    if (allReady) {
+      if (room.game.round >= 6) {
+        room.game.phase = "final";
+      } else {
+        advanceToNextRound(room);
+      }
+    }
+
+    reply?.({ ok: true, room: publicRoom(room), game: personalGameState(room, socket.id) });
+    if (allReady) {
+      emitGameState(room);
+    } else {
+      emitRoom(room);
+    }
   });
 
   socket.on("disconnect", () => {
