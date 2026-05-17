@@ -211,6 +211,7 @@ const playersModal = document.querySelector("#playersModal");
 const playersTitle = document.querySelector("#playersTitle");
 const playerModalList = document.querySelector("#playerModalList");
 const hintModal = document.querySelector("#hintModal");
+const hintLabel = document.querySelector("#hintModal .label");
 const hintTitle = document.querySelector("#hintTitle");
 const hintContent = document.querySelector("#hintContent");
 const tradeModal = document.querySelector("#tradeModal");
@@ -768,9 +769,8 @@ function renderPlayerMapShops(player) {
   return shops.map((text) => `<span class="map-shop-token">${escapeHtml(text)}</span>`).join("");
 }
 
-function renderIncomeHint() {
-  hintTitle.textContent = "收入表";
-  hintContent.innerHTML = `
+function getIncomeHintHtml() {
+  return `
     <table class="income-hint-table">
       <thead>
         <tr>
@@ -808,6 +808,45 @@ function renderIncomeHint() {
   `;
 }
 
+function renderIncomeHint() {
+  hintLabel.textContent = "游戏提示";
+  hintTitle.textContent = "收入表";
+  hintContent.innerHTML = getIncomeHintHtml();
+}
+
+function renderEventLog() {
+  const events = currentGame?.eventLog || [];
+  if (!events.length) {
+    return `<p class="event-empty">暂无记录。开始游戏后，关键操作会出现在这里。</p>`;
+  }
+
+  return `
+    <div class="event-log">
+      ${events.map((event) => `
+        <article class="event-item event-${escapeHtml(event.type || "system")}">
+          <small>第${event.round || 1}轮</small>
+          <p>${escapeHtml(event.text)}</p>
+        </article>
+      `).join("")}
+    </div>
+  `;
+}
+
+function renderInfoModal(activeTab = "log") {
+  const isLog = activeTab === "log";
+  hintLabel.textContent = "游戏信息";
+  hintTitle.textContent = "信息";
+  hintContent.innerHTML = `
+    <div class="info-tabs" role="tablist" aria-label="游戏信息">
+      <button class="${isLog ? "is-active" : ""}" data-info-tab="log" type="button">记录</button>
+      <button class="${!isLog ? "is-active" : ""}" data-info-tab="hint" type="button">提示</button>
+    </div>
+    <div class="info-panel">
+      ${isLog ? renderEventLog() : getIncomeHintHtml()}
+    </div>
+  `;
+}
+
 function openHintModal() {
   hintModal.setAttribute("aria-hidden", "false");
 }
@@ -818,6 +857,7 @@ function closeHintModal() {
 
 function renderRoundAdvanceConfirm() {
   const remaining = currentGame?.shopCards?.length || 0;
+  hintLabel.textContent = "回合流程";
   hintTitle.textContent = "进入下一轮？";
   hintContent.innerHTML = `
     <p>确认后，本轮会先进行收入结算，然后再进入下一轮。</p>
@@ -849,6 +889,7 @@ function renderIncomeSettlementModal() {
     }).join("")
     : `<p class="hint-note">你本轮还没有可结算的店铺。</p>`;
 
+  hintLabel.textContent = "收入结算";
   hintTitle.textContent = "本回合收入结算";
   hintContent.innerHTML = `
     <div class="modal-income-total">
@@ -2395,7 +2436,7 @@ document.querySelector("#startGameButton").addEventListener("click", () => {
 });
 
 document.querySelector("#hintButton").addEventListener("click", () => {
-  renderIncomeHint();
+  renderInfoModal("log");
   openHintModal();
 });
 
@@ -2498,6 +2539,13 @@ playersModal.addEventListener("click", (event) => {
 document.querySelector("#closeHint").addEventListener("click", closeHintModal);
 
 hintContent.addEventListener("click", (event) => {
+  const infoTab = event.target.closest("[data-info-tab]");
+  if (infoTab) {
+    event.preventDefault();
+    renderInfoModal(infoTab.dataset.infoTab);
+    return;
+  }
+
   if (event.target.closest("[data-modal-close]")) {
     closeHintModal();
     return;

@@ -1767,6 +1767,91 @@ input {
   line-height: 1.6;
 }
 
+.info-tabs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  margin-bottom: 10px;
+  padding: 3px;
+  border: 1px solid rgba(214, 167, 58, 0.22);
+  border-radius: 8px;
+  background: rgba(8, 5, 3, 0.26);
+}
+
+.info-tabs button {
+  min-height: 32px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--muted);
+  background: transparent;
+  font: 900 12px/1 "PingFang SC", sans-serif;
+}
+
+.info-tabs button.is-active {
+  border-color: rgba(16, 201, 193, 0.46);
+  color: #d9fffb;
+  background: rgba(16, 201, 193, 0.14);
+}
+
+.info-panel {
+  min-height: 150px;
+}
+
+.event-log {
+  display: grid;
+  gap: 7px;
+  max-height: min(54vh, 360px);
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.event-item {
+  display: grid;
+  grid-template-columns: 46px minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+  padding: 8px;
+  border: 1px solid rgba(214, 167, 58, 0.2);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.16);
+}
+
+.event-item small {
+  display: grid;
+  place-items: center;
+  min-height: 22px;
+  border-radius: 999px;
+  color: #f2d59b;
+  background: rgba(214, 167, 58, 0.1);
+  font: 900 10px/1 "PingFang SC", sans-serif;
+  white-space: nowrap;
+}
+
+.event-item p {
+  margin: 0;
+  color: var(--paper);
+  font: 800 12px/1.45 "PingFang SC", sans-serif;
+}
+
+.event-trade {
+  border-color: rgba(16, 201, 193, 0.3);
+  background: rgba(16, 201, 193, 0.08);
+}
+
+.event-income {
+  border-color: rgba(214, 167, 58, 0.32);
+  background: rgba(214, 167, 58, 0.08);
+}
+
+.event-empty {
+  padding: 18px 10px;
+  border: 1px dashed rgba(214, 167, 58, 0.28);
+  border-radius: 8px;
+  color: var(--muted);
+  text-align: center;
+  background: rgba(255, 255, 255, 0.03);
+}
+
 .income-hint-table {
   width: 100%;
   border-collapse: collapse;

@@ -11,7 +11,7 @@
     <title>霓虹唐埠 - 手机原型 P0</title>
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="icon" href="/assets/app-icon.svg" />
-    <link rel="stylesheet" href="styles.css?v=trade-exec-2" />
+    <link rel="stylesheet" href="styles.css?v=info-log-1" />
   </head>
   <body>
     <main class="entry-shell screen is-active" id="homeScreen">
@@ -126,7 +126,7 @@
           <div class="selected-summary" id="selectedSummary">未选择地块</div>
           <div class="side-actions">
             <button id="playersButton" type="button">玩家</button>
-            <button id="hintButton" type="button">提示</button>
+            <button id="hintButton" type="button">信息</button>
           </div>
         </div>
         <div class="board-wrap" id="boardWrap">
@@ -173,8 +173,8 @@
       <section class="hint-modal" role="dialog" aria-modal="true" aria-labelledby="hintTitle">
         <div class="hint-head">
           <div>
-            <span class="label">游戏提示</span>
-            <h2 id="hintTitle">本轮建议</h2>
+            <span class="label">游戏信息</span>
+            <h2 id="hintTitle">信息</h2>
           </div>
           <button id="closeHint" type="button">关闭</button>
         </div>
@@ -197,6 +197,6 @@
     </div>
 
     <script src="/socket.io/socket.io.js"></script>
-    <script src="app.js?v=trade-exec-2"></script>
+    <script src="app.js?v=info-log-1"></script>
   </body>
 </html>

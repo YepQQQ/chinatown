@@ -360,6 +360,25 @@ function settleIncome(room) {
   room.game.incomeSettled = true;
 }
 
+function formatMoney(value) {
+  return `${Number(Number(value || 0).toFixed(1)).toLocaleString("zh-CN")}万`;
+}
+
+function addGameEvent(room, text, type = "system") {
+  if (!room?.game || !text) return;
+
+  room.game.eventSeq = (room.game.eventSeq || 0) + 1;
+  room.game.eventLog ||= [];
+  room.game.eventLog.unshift({
+    id: room.game.eventSeq,
+    round: room.game.round || 1,
+    type,
+    text,
+    createdAt: Date.now(),
+  });
+  room.game.eventLog = room.game.eventLog.slice(0, 40);
+}
+
 function advanceToNextRound(room) {
   const game = room.game;
   game.round += 1;
@@ -407,6 +426,8 @@ function createGame(room) {
     nextRoundReady: {},
     pendingTrades: {},
     tradeSeq: 1,
+    eventLog: [],
+    eventSeq: 0,
     incomeRows: [],
     incomeSettled: false,
     buildingKeepCount: buildingRule.keep,
@@ -449,6 +470,7 @@ function personalGameState(room, playerId) {
     cash: room.players.find((player) => player.id === playerId)?.cash ?? 5,
     incomeRows: room.game.incomeRows || [],
     incomeSettled: Boolean(room.game.incomeSettled),
+    eventLog: room.game.eventLog || [],
     shopTileDrawCount: room.game.shopTileDrawCount,
     deckRemaining: room.game.buildingDeck.length,
   };
@@ -814,6 +836,8 @@ io.on("connection", (socket) => {
       player.cash = 5;
     });
     room.game = createGame(room);
+    const starter = room.players.find((player) => player.id === room.starterId);
+    addGameEvent(room, `游戏开始，${starter?.name || "玩家"}成为起始玩家。`, "system");
     reply?.({ ok: true, room: publicRoom(room), game: personalGameState(room, socket.id) });
     emitGameStarted(room);
   });
@@ -851,6 +875,7 @@ io.on("connection", (socket) => {
         const owned = new Set(room.game.ownedLots[player.id] || []);
         (room.game.buildingSelections[player.id] || []).forEach((lotId) => owned.add(lotId));
         room.game.ownedLots[player.id] = [...owned].sort((a, b) => a - b);
+        addGameEvent(room, `${player.name}保留地块 ${room.game.buildingSelections[player.id].join("、")}。`, "lot");
       });
       updatePlayerStats(room);
       room.game.phase = "building-reveal";
@@ -876,6 +901,7 @@ io.on("connection", (socket) => {
             ...room.game.shopDeck.splice(0, room.game.shopTileDrawCount),
           ];
         });
+        addGameEvent(room, `第${room.game.round}轮店铺已发放。`, "shop");
         emitGameState(room);
       }, 1800);
     }
@@ -929,6 +955,7 @@ io.on("connection", (socket) => {
       ownerId: socket.id,
       ownerName: player?.name || "玩家",
     };
+    addGameEvent(room, `${player?.name || "玩家"}在${targetLotId}号地块放置${shop.name}。`, "shop");
     updatePlayerStats(room);
 
     reply?.({ ok: true, room: publicRoom(room), game: personalGameState(room, socket.id) });
@@ -952,6 +979,12 @@ io.on("connection", (socket) => {
     const allReady = room.players.every((item) => room.game.shopReady[item.id]);
     if (allReady) {
       settleIncome(room);
+      room.players.forEach((player) => {
+        const income = (room.game.incomeRows || [])
+          .filter((row) => row.playerId === player.id)
+          .reduce((total, row) => total + row.income, 0);
+        addGameEvent(room, `${player.name}第${room.game.round}轮收入 +${formatMoney(income)}。`, "income");
+      });
       room.game.phase = "income";
     }
 
@@ -1053,6 +1086,7 @@ io.on("connection", (socket) => {
       return;
     }
 
+    addGameEvent(room, `交易完成：${proposal.text}`, "trade");
     reply?.({ ok: true, room: publicRoom(room), game: personalGameState(room, socket.id) });
     emitGameState(room);
     io.to(room.code).emit("tradeResolved", {
@@ -1081,8 +1115,10 @@ io.on("connection", (socket) => {
     if (allReady) {
       if (room.game.round >= 6) {
         room.game.phase = "final";
+        addGameEvent(room, "游戏结束，进入最终结算。", "system");
       } else {
         advanceToNextRound(room);
+        addGameEvent(room, `进入第${room.game.round}轮。`, "system");
       }
     }
 
