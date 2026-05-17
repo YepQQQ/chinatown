@@ -214,8 +214,10 @@ const hintModal = document.querySelector("#hintModal");
 const hintTitle = document.querySelector("#hintTitle");
 const hintContent = document.querySelector("#hintContent");
 const tradeModal = document.querySelector("#tradeModal");
+const tradeTitle = document.querySelector("#tradeTitle");
 const tradeBody = document.querySelector("#tradeBody");
 const submitTrade = document.querySelector("#submitTrade");
+const closeTradeButton = document.querySelector("#closeTrade");
 const socket = typeof io === "function" ? io() : null;
 const params = new URLSearchParams(window.location.search);
 const isDevMode = params.get("dev") === "1";
@@ -234,6 +236,7 @@ let selectedBuildingKeeps = new Set();
 let buildingDraftConfirmed = false;
 let selectedShopCardId = null;
 let tradeDraft = makeEmptyTradeDraft();
+let activeTradeProposal = null;
 let locatedCellTimer = null;
 
 const sessionStorageKey = "neonTangbuSession";
@@ -1548,6 +1551,28 @@ function adjustTradeShop(mapName, shopId, step, max, element) {
   if (pickedEl) pickedEl.textContent = next ? `x${next}` : "";
 }
 
+function clampTradeShopMap(shopMap, availableShops) {
+  const availableCounts = new Map(availableShops.map((shop) => [shop.id, shop.count]));
+  [...shopMap.entries()].forEach(([shopId, count]) => {
+    const max = availableCounts.get(shopId) || 0;
+    const next = Math.min(count, max);
+    if (next > 0) {
+      shopMap.set(shopId, next);
+    } else {
+      shopMap.delete(shopId);
+    }
+  });
+}
+
+function clampTradeLotSet(lotSet, availableLots) {
+  const availableIds = new Set(availableLots.map((item) => String(item.value)));
+  [...lotSet].forEach((lotId) => {
+    if (!availableIds.has(String(lotId))) {
+      lotSet.delete(lotId);
+    }
+  });
+}
+
 function renderTradeModal() {
   const targets = getTradeTargets();
   const target = targets.find((player) => player.id === tradeDraft.targetId) || targets[0];
@@ -1561,6 +1586,10 @@ function renderTradeModal() {
     .map((item) => ({ value: item.lotId, text: `${item.lotId}` }));
   const ownShops = groupShopCards(currentGame?.shopCards || []);
   const requestShops = groupShopCards(getPublicPlayerShopCards(target));
+  clampTradeLotSet(tradeDraft.offerLots, selfLots);
+  clampTradeLotSet(tradeDraft.requestLots, targetLots);
+  clampTradeShopMap(tradeDraft.offerShops, ownShops);
+  clampTradeShopMap(tradeDraft.requestShops, requestShops);
 
   tradeBody.innerHTML = `
     <div class="trade-targets">
@@ -1592,7 +1621,19 @@ function renderTradeModal() {
   `;
 }
 
+function showTradeError(message) {
+  let errorEl = tradeBody.querySelector("[data-trade-error]");
+  if (!errorEl) {
+    errorEl = document.createElement("p");
+    errorEl.className = "trade-error";
+    errorEl.dataset.tradeError = "true";
+    tradeBody.prepend(errorEl);
+  }
+  errorEl.textContent = message;
+}
+
 function openTradeModal() {
+  resetTradeModalMode();
   tradeDraft = makeEmptyTradeDraft();
   tradeDraft.targetId = getTradeTargets()[0]?.id || null;
   renderTradeModal();
@@ -1621,6 +1662,167 @@ function summarizeTradeDraft() {
     ? `向${target?.name || "玩家"}提议：${bits.join("；")}`
     : "交易提议为空";
   tradeModal.setAttribute("aria-hidden", "true");
+}
+
+function tradeShopSummary(shops = {}) {
+  return Object.entries(shops)
+    .filter(([, count]) => Number(count) > 0)
+    .map(([shopId, count]) => {
+      const shop = shopCatalog.find((item) => item.id === shopId);
+      return `${shop?.name || shopId}x${count}`;
+    })
+    .join("、");
+}
+
+function tradeSideSummary(side = {}) {
+  const bits = [];
+  if (side.lots?.length) bits.push(`地块 ${side.lots.join("、")}`);
+  const shops = tradeShopSummary(side.shops);
+  if (shops) bits.push(`店铺 ${shops}`);
+  if (side.cash) bits.push(`现金 ${side.cash}万`);
+  return bits.join("；") || "无";
+}
+
+function serializeTradeDraft() {
+  return {
+    offer: {
+      lots: [...tradeDraft.offerLots].map(Number),
+      shops: Object.fromEntries(tradeDraft.offerShops),
+      cash: tradeDraft.offerCash,
+    },
+    request: {
+      lots: [...tradeDraft.requestLots].map(Number),
+      shops: Object.fromEntries(tradeDraft.requestShops),
+      cash: tradeDraft.requestCash,
+    },
+  };
+}
+
+function isTradePayloadEmpty(trade) {
+  return !(
+    trade.offer.lots.length
+    || Object.keys(trade.offer.shops).length
+    || trade.offer.cash
+    || trade.request.lots.length
+    || Object.keys(trade.request.shops).length
+    || trade.request.cash
+  );
+}
+
+function resetTradeModalMode() {
+  activeTradeProposal = null;
+  tradeTitle.textContent = "发起交易";
+  submitTrade.textContent = "发送交易提议";
+  closeTradeButton.textContent = "关闭";
+  submitTrade.dataset.mode = "create";
+  submitTrade.disabled = false;
+  submitTrade.hidden = false;
+}
+
+function closeTradeModal() {
+  tradeModal.setAttribute("aria-hidden", "true");
+  resetTradeModalMode();
+}
+
+function createTradeProposal() {
+  const target = getTradeTargets().find((player) => player.id === tradeDraft.targetId);
+  const trade = serializeTradeDraft();
+
+  if (!target) {
+    selectedSummary.textContent = "请选择交易对象。";
+    showTradeError("请选择交易对象。");
+    return;
+  }
+
+  if (isTradePayloadEmpty(trade)) {
+    selectedSummary.textContent = "交易提议为空。";
+    showTradeError("交易提议为空。");
+    return;
+  }
+
+  if (!socket || isDevMode || !room?.code) {
+    selectedSummary.textContent = "真实交易需要在多人房间里测试。";
+    showTradeError("真实交易需要在多人房间里测试。");
+    return;
+  }
+
+  submitTrade.disabled = true;
+  socket.emit("createTradeProposal", { code: room.code, targetId: target.id, trade }, (reply) => {
+    submitTrade.disabled = false;
+
+    if (!reply?.ok) {
+      if (reply?.game) {
+        applyServerGameState(reply.room, reply.game);
+        renderPlayers();
+        renderHand();
+        renderShops();
+        renderTradeModal();
+      }
+      selectedSummary.textContent = reply?.error || "交易提议发送失败。";
+      showTradeError(reply?.error || "交易提议发送失败。");
+      return;
+    }
+
+    selectedSummary.textContent = `已向${target.name}发送交易提议，等待对方确认。`;
+    closeTradeModal();
+  });
+}
+
+function renderIncomingTrade(proposal) {
+  activeTradeProposal = proposal;
+  tradeTitle.textContent = "收到交易提议";
+  closeTradeButton.textContent = "拒绝";
+  submitTrade.dataset.mode = "accept";
+  submitTrade.disabled = false;
+  submitTrade.hidden = true;
+  tradeBody.innerHTML = `
+    <div class="trade-review">
+      <p class="trade-review-from">${escapeHtml(proposal.fromName)} 想和你交易</p>
+      <section>
+        <h3>你将获得</h3>
+        <p>${escapeHtml(tradeSideSummary(proposal.offer))}</p>
+      </section>
+      <section>
+        <h3>你要给出</h3>
+        <p>${escapeHtml(tradeSideSummary(proposal.request))}</p>
+      </section>
+      <div class="trade-response-actions">
+        <button class="trade-reject" data-trade-response="reject" type="button">拒绝</button>
+        <button class="trade-accept" data-trade-response="accept" type="button">接受</button>
+      </div>
+    </div>
+  `;
+  tradeModal.setAttribute("aria-hidden", "false");
+  selectedSummary.textContent = `收到${proposal.fromName}的交易提议。`;
+}
+
+function respondTradeProposal(accepted) {
+  if (!activeTradeProposal || !socket || !room?.code) return;
+
+  submitTrade.disabled = true;
+  socket.emit("respondTradeProposal", {
+    code: room.code,
+    tradeId: activeTradeProposal.id,
+    accepted,
+  }, (reply) => {
+    submitTrade.disabled = false;
+
+    if (!reply?.ok) {
+      selectedSummary.textContent = reply?.error || "处理交易失败。";
+      return;
+    }
+
+    if (reply.game) {
+      applyServerGameState(reply.room, reply.game);
+      renderPlayers();
+      renderHand();
+      renderShops();
+      updateDraftSummary();
+    }
+
+    selectedSummary.textContent = accepted ? "交易已执行。" : "已拒绝交易。";
+    closeTradeModal();
+  });
 }
 
 function getSelectedShopCard() {
@@ -2229,6 +2431,13 @@ tradeBody.addEventListener("click", (event) => {
     return;
   }
 
+  const responseButton = event.target.closest("[data-trade-response]");
+  if (responseButton) {
+    event.preventDefault();
+    respondTradeProposal(responseButton.dataset.tradeResponse === "accept");
+    return;
+  }
+
   const chip = event.target.closest("[data-set]");
   if (chip) {
     event.preventDefault();
@@ -2247,15 +2456,32 @@ tradeBody.addEventListener("input", (event) => {
   }
 });
 
-submitTrade.addEventListener("click", summarizeTradeDraft);
+submitTrade.addEventListener("click", () => {
+  if (submitTrade.dataset.mode === "accept") {
+    respondTradeProposal(true);
+    return;
+  }
 
-document.querySelector("#closeTrade").addEventListener("click", () => {
-  tradeModal.setAttribute("aria-hidden", "true");
+  createTradeProposal();
+});
+
+closeTradeButton.addEventListener("click", () => {
+  if (submitTrade.dataset.mode === "accept" && activeTradeProposal) {
+    respondTradeProposal(false);
+    return;
+  }
+
+  closeTradeModal();
 });
 
 tradeModal.addEventListener("click", (event) => {
   if (event.target === tradeModal) {
-    tradeModal.setAttribute("aria-hidden", "true");
+    if (submitTrade.dataset.mode === "accept" && activeTradeProposal) {
+      respondTradeProposal(false);
+      return;
+    }
+
+    closeTradeModal();
   }
 });
 
@@ -2404,6 +2630,14 @@ if (socket) {
     renderHand();
     renderShops();
     updateDraftSummary();
+  });
+
+  socket.on("tradeProposal", (proposal) => {
+    renderIncomingTrade(proposal);
+  });
+
+  socket.on("tradeResolved", (result) => {
+    selectedSummary.textContent = result?.text || "交易状态已更新。";
   });
 }
 

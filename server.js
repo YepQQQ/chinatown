@@ -56,6 +56,7 @@ const INCOME_TABLE = {
   incomplete: { 1: 1, 2: 2, 3: 4, 4: 6, 5: 8 },
   complete: { 3: 5, 4: 8, 5: 11, 6: 14 },
 };
+const TRADE_CASH_LIMIT = 50;
 
 function lot(id, x, y, w, h) {
   return { id, x, y, w, h, cx: x + w / 2, cy: y + h / 2 };
@@ -226,6 +227,10 @@ function transferPlayerSocket(room, oldId, newSocket) {
     moveGameMapEntry(room.game.nextRoundReady, oldId, newId);
     Object.values(room.game.placedShops || {}).forEach((shop) => {
       if (shop.ownerId === oldId) shop.ownerId = newId;
+    });
+    Object.values(room.game.pendingTrades || {}).forEach((trade) => {
+      if (trade.fromId === oldId) trade.fromId = newId;
+      if (trade.toId === oldId) trade.toId = newId;
     });
   }
 
@@ -400,6 +405,8 @@ function createGame(room) {
     placedShops: {},
     shopReady: {},
     nextRoundReady: {},
+    pendingTrades: {},
+    tradeSeq: 1,
     incomeRows: [],
     incomeSettled: false,
     buildingKeepCount: buildingRule.keep,
@@ -457,6 +464,179 @@ function updatePlayerStats(room) {
       .length;
     player.stats = `${lotCount} 地块 · ${shopCount} 商铺`;
   });
+}
+
+function normalizeTradeLots(lots) {
+  return [...new Set((Array.isArray(lots) ? lots : [])
+    .map(Number)
+    .filter((id) => Number.isInteger(id) && id >= 1 && id <= 85))]
+    .sort((a, b) => a - b);
+}
+
+function normalizeTradeShops(shops) {
+  const counts = {};
+  Object.entries(shops || {}).forEach(([shopId, count]) => {
+    const catalogItem = SHOP_TYPES.find((shop) => shop.id === shopId);
+    const nextCount = Math.max(0, Math.min(12, Math.floor(Number(count) || 0)));
+    if (catalogItem && nextCount > 0) {
+      counts[shopId] = nextCount;
+    }
+  });
+  return counts;
+}
+
+function normalizeTradeCash(value) {
+  return Math.max(0, Math.min(TRADE_CASH_LIMIT, Math.floor(Number(value) || 0)));
+}
+
+function normalizeTradePayload(payload) {
+  return {
+    offer: {
+      lots: normalizeTradeLots(payload?.offer?.lots),
+      shops: normalizeTradeShops(payload?.offer?.shops),
+      cash: normalizeTradeCash(payload?.offer?.cash),
+    },
+    request: {
+      lots: normalizeTradeLots(payload?.request?.lots),
+      shops: normalizeTradeShops(payload?.request?.shops),
+      cash: normalizeTradeCash(payload?.request?.cash),
+    },
+  };
+}
+
+function tradeHasContent(trade) {
+  return Boolean(
+    trade.offer.lots.length
+    || Object.keys(trade.offer.shops).length
+    || trade.offer.cash
+    || trade.request.lots.length
+    || Object.keys(trade.request.shops).length
+    || trade.request.cash,
+  );
+}
+
+function hasLots(game, playerId, lotIds) {
+  const owned = new Set((game.ownedLots[playerId] || []).map(Number));
+  return lotIds.every((lotId) => owned.has(Number(lotId)));
+}
+
+function countShopCards(hand = []) {
+  return hand.reduce((counts, shop) => {
+    counts[shop.id] = (counts[shop.id] || 0) + 1;
+    return counts;
+  }, {});
+}
+
+function hasShopCards(hand, requestedCounts) {
+  const counts = countShopCards(hand);
+  return Object.entries(requestedCounts).every(([shopId, count]) => (counts[shopId] || 0) >= count);
+}
+
+function validateTrade(room, trade) {
+  const game = room.game;
+  const from = room.players.find((player) => player.id === trade.fromId);
+  const to = room.players.find((player) => player.id === trade.toId);
+
+  if (!game || !from || !to) return "交易玩家不存在。";
+  if (from.id === to.id) return "不能和自己交易。";
+  if (!tradeHasContent(trade)) return "交易提议为空。";
+  if (!hasLots(game, from.id, trade.offer.lots)) return `${from.name}已经没有这些地块。`;
+  if (!hasLots(game, to.id, trade.request.lots)) return `${to.name}已经没有这些地块。`;
+  if (!hasShopCards(game.shopDrafts[from.id] || [], trade.offer.shops)) return `${from.name}手上店铺不足。`;
+  if (!hasShopCards(game.shopDrafts[to.id] || [], trade.request.shops)) return `${to.name}手上店铺不足。`;
+  return null;
+}
+
+function takeShopCards(hand, requestedCounts) {
+  const taken = [];
+
+  Object.entries(requestedCounts).forEach(([shopId, count]) => {
+    for (let index = 0; index < count; index += 1) {
+      const shopIndex = hand.findIndex((shop) => shop.id === shopId);
+      if (shopIndex >= 0) {
+        taken.push(hand.splice(shopIndex, 1)[0]);
+      }
+    }
+  });
+
+  return taken;
+}
+
+function transferLots(room, fromId, toId, lotIds) {
+  if (!lotIds.length) return;
+
+  const fromLots = new Set((room.game.ownedLots[fromId] || []).map(Number));
+  const toLots = new Set((room.game.ownedLots[toId] || []).map(Number));
+  const toPlayer = room.players.find((player) => player.id === toId);
+
+  lotIds.forEach((lotId) => {
+    fromLots.delete(lotId);
+    toLots.add(lotId);
+    if (room.game.placedShops?.[lotId]) {
+      room.game.placedShops[lotId].ownerId = toId;
+      room.game.placedShops[lotId].ownerName = toPlayer?.name || "玩家";
+    }
+  });
+
+  room.game.ownedLots[fromId] = [...fromLots].sort((a, b) => a - b);
+  room.game.ownedLots[toId] = [...toLots].sort((a, b) => a - b);
+}
+
+function applyTrade(room, trade) {
+  const error = validateTrade(room, trade);
+  if (error) return error;
+
+  const from = room.players.find((player) => player.id === trade.fromId);
+  const to = room.players.find((player) => player.id === trade.toId);
+  const fromHand = room.game.shopDrafts[from.id] || [];
+  const toHand = room.game.shopDrafts[to.id] || [];
+
+  transferLots(room, from.id, to.id, trade.offer.lots);
+  transferLots(room, to.id, from.id, trade.request.lots);
+
+  const offeredShops = takeShopCards(fromHand, trade.offer.shops);
+  const requestedShops = takeShopCards(toHand, trade.request.shops);
+  room.game.shopDrafts[from.id] = [...fromHand, ...requestedShops];
+  room.game.shopDrafts[to.id] = [...toHand, ...offeredShops];
+
+  from.cash = (from.cash ?? 5) - trade.offer.cash + trade.request.cash;
+  to.cash = (to.cash ?? 5) + trade.offer.cash - trade.request.cash;
+
+  updatePlayerStats(room);
+  return null;
+}
+
+function shopCountsToText(shops) {
+  return Object.entries(shops || {})
+    .map(([shopId, count]) => {
+      const shop = SHOP_TYPES.find((item) => item.id === shopId);
+      return `${shop?.name || shopId}x${count}`;
+    })
+    .join("、");
+}
+
+function tradeSideText(side) {
+  const bits = [];
+  if (side.lots.length) bits.push(`地块 ${side.lots.join("、")}`);
+  const shops = shopCountsToText(side.shops);
+  if (shops) bits.push(`店铺 ${shops}`);
+  if (side.cash) bits.push(`现金 ${side.cash}万`);
+  return bits.join("；") || "无";
+}
+
+function publicTrade(room, trade) {
+  const from = room.players.find((player) => player.id === trade.fromId);
+  const to = room.players.find((player) => player.id === trade.toId);
+  return {
+    id: trade.id,
+    fromId: trade.fromId,
+    toId: trade.toId,
+    fromName: from?.name || "玩家",
+    toName: to?.name || "玩家",
+    offer: trade.offer,
+    request: trade.request,
+    text: `${from?.name || "玩家"}给出：${tradeSideText(trade.offer)}；想要：${tradeSideText(trade.request)}`,
+  };
 }
 
 function emitGameStarted(room) {
@@ -752,7 +932,7 @@ io.on("connection", (socket) => {
     updatePlayerStats(room);
 
     reply?.({ ok: true, room: publicRoom(room), game: personalGameState(room, socket.id) });
-    emitRoom(room);
+    emitGameState(room);
   });
 
   socket.on("confirmShopPlacement", ({ code }, reply) => {
@@ -781,6 +961,110 @@ io.on("connection", (socket) => {
     } else {
       emitRoom(room);
     }
+  });
+
+  socket.on("createTradeProposal", ({ code, targetId, trade }, reply) => {
+    const room = rooms.get(String(code || "").trim().toUpperCase());
+
+    if (!room || !room.game) {
+      reply?.({ ok: false, error: "房间不存在。" });
+      return;
+    }
+
+    if (room.phase !== "playing") {
+      reply?.({ ok: false, error: "现在还不能交易。" });
+      return;
+    }
+
+    const target = room.players.find((player) => player.id === targetId);
+    if (!target || target.id === socket.id) {
+      reply?.({ ok: false, error: "请选择有效的交易对象。" });
+      return;
+    }
+
+    const normalizedTrade = {
+      id: `T${room.game.tradeSeq || 1}`,
+      fromId: socket.id,
+      toId: target.id,
+      ...normalizeTradePayload(trade),
+      createdAt: Date.now(),
+    };
+    room.game.pendingTrades ||= {};
+    room.game.tradeSeq = (room.game.tradeSeq || 1) + 1;
+
+    const error = validateTrade(room, normalizedTrade);
+    if (error) {
+      reply?.({
+        ok: false,
+        error,
+        room: publicRoom(room),
+        game: personalGameState(room, socket.id),
+      });
+      return;
+    }
+
+    room.game.pendingTrades[normalizedTrade.id] = normalizedTrade;
+    const publicProposal = publicTrade(room, normalizedTrade);
+    io.to(target.id).emit("tradeProposal", publicProposal);
+    reply?.({ ok: true, proposal: publicProposal });
+  });
+
+  socket.on("respondTradeProposal", ({ code, tradeId, accepted }, reply) => {
+    const room = rooms.get(String(code || "").trim().toUpperCase());
+
+    if (!room || !room.game) {
+      reply?.({ ok: false, error: "房间不存在。" });
+      return;
+    }
+
+    room.game.pendingTrades ||= {};
+    const trade = room.game.pendingTrades[tradeId];
+    if (!trade) {
+      reply?.({ ok: false, error: "这笔交易已经失效。" });
+      return;
+    }
+
+    if (trade.toId !== socket.id) {
+      reply?.({ ok: false, error: "只有交易对象可以处理这笔交易。" });
+      return;
+    }
+
+    const proposal = publicTrade(room, trade);
+    delete room.game.pendingTrades[trade.id];
+
+    if (!accepted) {
+      io.to(trade.fromId).emit("tradeResolved", {
+        accepted: false,
+        text: `${proposal.toName}拒绝了交易。`,
+        proposal,
+      });
+      reply?.({ ok: true, room: publicRoom(room), game: personalGameState(room, socket.id) });
+      return;
+    }
+
+    const error = applyTrade(room, trade);
+    if (error) {
+      io.to(trade.fromId).emit("tradeResolved", {
+        accepted: false,
+        text: `交易失败：${error}`,
+        proposal,
+      });
+      reply?.({ ok: false, error });
+      return;
+    }
+
+    io.to(trade.fromId).emit("tradeResolved", {
+      accepted: true,
+      text: `${proposal.toName}接受了交易。`,
+      proposal,
+    });
+    io.to(trade.toId).emit("tradeResolved", {
+      accepted: true,
+      text: "你已接受交易。",
+      proposal,
+    });
+    reply?.({ ok: true, room: publicRoom(room), game: personalGameState(room, socket.id) });
+    emitGameState(room);
   });
 
   socket.on("agreeNextRound", ({ code }, reply) => {

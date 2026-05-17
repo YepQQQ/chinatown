@@ -1226,6 +1226,16 @@ input {
   padding-right: 2px;
 }
 
+.trade-error {
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid rgba(217, 74, 55, 0.58);
+  border-radius: 8px;
+  color: #ffe2dc;
+  background: rgba(110, 30, 24, 0.36);
+  font: 800 12px/1.35 "PingFang SC", sans-serif;
+}
+
 .trade-targets {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1415,6 +1425,58 @@ input {
 .trade-submit {
   width: 100%;
   margin-top: 12px;
+}
+
+.trade-review {
+  display: grid;
+  gap: 10px;
+}
+
+.trade-review-from {
+  margin: 0;
+  color: var(--paper);
+  font: 900 16px/1.25 "PingFang SC", sans-serif;
+}
+
+.trade-review section {
+  padding: 10px;
+  border: 1px solid rgba(214, 167, 58, 0.24);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.18);
+}
+
+.trade-review h3 {
+  margin: 0 0 6px;
+  color: #f2d59b;
+  font: 900 13px/1 "PingFang SC", sans-serif;
+}
+
+.trade-review p {
+  margin: 0;
+  color: var(--paper);
+  font: 700 13px/1.45 "PingFang SC", sans-serif;
+}
+
+.trade-response-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.trade-reject,
+.trade-accept {
+  min-height: 40px;
+  border: 1px solid rgba(214, 167, 58, 0.32);
+  border-radius: 8px;
+  color: var(--paper);
+  background: rgba(214, 167, 58, 0.1);
+  font: 900 13px/1 "PingFang SC", sans-serif;
+}
+
+.trade-accept {
+  border-color: rgba(16, 201, 193, 0.58);
+  color: #d9fffb;
+  background: rgba(16, 201, 193, 0.18);
 }
 
 @keyframes dealIn {
