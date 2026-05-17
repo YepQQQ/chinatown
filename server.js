@@ -1053,18 +1053,13 @@ io.on("connection", (socket) => {
       return;
     }
 
-    io.to(trade.fromId).emit("tradeResolved", {
-      accepted: true,
-      text: `${proposal.toName}接受了交易。`,
-      proposal,
-    });
-    io.to(trade.toId).emit("tradeResolved", {
-      accepted: true,
-      text: "你已接受交易。",
-      proposal,
-    });
     reply?.({ ok: true, room: publicRoom(room), game: personalGameState(room, socket.id) });
     emitGameState(room);
+    io.to(room.code).emit("tradeResolved", {
+      accepted: true,
+      text: `交易完成：${proposal.text}`,
+      proposal,
+    });
   });
 
   socket.on("agreeNextRound", ({ code }, reply) => {
