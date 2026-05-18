@@ -11,7 +11,7 @@
     <title>霓虹唐埠 - 手机原型 P0</title>
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="icon" href="/assets/app-icon.svg" />
-    <link rel="stylesheet" href="styles.css?v=info-log-1" />
+    <link rel="stylesheet" href="styles.css?v=full-audit-1" />
   </head>
   <body>
     <main class="entry-shell screen is-active" id="homeScreen">
@@ -196,7 +196,30 @@
       </section>
     </div>
 
+    <aside class="test-tools" id="testTools" hidden>
+      <button class="test-toggle" id="testToggle" type="button">测试</button>
+      <section class="test-panel" id="testPanel" aria-hidden="true">
+        <div class="test-head">
+          <strong>测试辅助</strong>
+          <small>仅 ?test=1</small>
+        </div>
+        <div class="test-grid">
+          <button data-test-action="fillBots" type="button">补满玩家</button>
+          <button data-test-action="startGame" type="button">开始游戏</button>
+          <button data-test-action="toShopDraft" type="button">发店铺</button>
+          <button data-test-action="placeChain" type="button">茶馆连锁</button>
+          <button data-test-action="settleIncome" type="button">结算本轮</button>
+          <button data-test-action="nextRound" type="button">下一轮</button>
+          <button data-test-action="jumpToRound" data-round="5" type="button">到第5轮</button>
+          <button data-test-action="finishGame" type="button">最终结算</button>
+          <button data-test-action="audit" type="button">规则自检</button>
+          <button data-test-action="fullAudit" type="button">全流程自检</button>
+        </div>
+        <p id="testStatus">创建房间后可用。</p>
+      </section>
+    </aside>
+
     <script src="/socket.io/socket.io.js"></script>
-    <script src="app.js?v=info-log-1"></script>
+    <script src="app.js?v=full-audit-1"></script>
   </body>
 </html>

@@ -219,11 +219,16 @@ const tradeTitle = document.querySelector("#tradeTitle");
 const tradeBody = document.querySelector("#tradeBody");
 const submitTrade = document.querySelector("#submitTrade");
 const closeTradeButton = document.querySelector("#closeTrade");
-const socket = typeof io === "function" ? io() : null;
 const params = new URLSearchParams(window.location.search);
 const isDevMode = params.get("dev") === "1";
+const isTestMode = isDevMode || params.get("test") === "1";
+const socket = typeof io === "function" ? io({ auth: { testMode: isTestMode ? "1" : "0" } }) : null;
 const isCoordMode = params.get("coords") === "1";
 const devPlayerCount = [3, 4].includes(Number(params.get("players"))) ? Number(params.get("players")) : 3;
+const testTools = document.querySelector("#testTools");
+const testPanel = document.querySelector("#testPanel");
+const testToggle = document.querySelector("#testToggle");
+const testStatus = document.querySelector("#testStatus");
 let selectedCell = null;
 let selectedRoomSize = devPlayerCount;
 let room = null;
@@ -239,6 +244,7 @@ let selectedShopCardId = null;
 let tradeDraft = makeEmptyTradeDraft();
 let activeTradeProposal = null;
 let locatedCellTimer = null;
+let finalSettlementShown = false;
 
 const sessionStorageKey = "neonTangbuSession";
 
@@ -258,6 +264,10 @@ if (nicknameInput.value.trim() === "你") {
 
 function saveSession() {
   if (!room?.code || !currentPlayerId || isDevMode) return;
+  if (currentGame?.phase === "final") {
+    clearSavedSession();
+    return;
+  }
 
   sessionStorage.setItem(sessionStorageKey, JSON.stringify({
     code: room.code,
@@ -271,6 +281,42 @@ function readSession() {
   } catch (error) {
     return null;
   }
+}
+
+function clearSavedSession() {
+  sessionStorage.removeItem(sessionStorageKey);
+}
+
+function resetToHome() {
+  if (socket && room?.code && !isDevMode) {
+    socket.emit("leaveRoom");
+  }
+
+  clearSavedSession();
+  closeHintModal();
+  closeTradeModal();
+  playersModal.setAttribute("aria-hidden", "true");
+  room = null;
+  currentGame = null;
+  lotOwners = {};
+  selectedBuildingKeeps = new Set();
+  buildingDraftConfirmed = false;
+  selectedShopCardId = null;
+  tradeDraft = makeEmptyTradeDraft();
+  activeTradeProposal = null;
+  finalSettlementShown = false;
+  currentPlayerId = socket?.id || currentPlayerId;
+  homeError.textContent = "";
+  waitingStatus.textContent = "";
+  selectedSummary.textContent = "未选择地块";
+  roundLabel.textContent = "1/6轮";
+  cashLabel.textContent = formatMoney(5);
+  clearSelection();
+  renderBoard();
+  renderPlayers();
+  renderHand();
+  renderShops();
+  showScreen(homeScreen);
 }
 
 function showScreen(screen) {
@@ -463,15 +509,150 @@ function isHost() {
   return room && (room.hostId === currentPlayerId || !socket);
 }
 
+function withCurrentModeUrl(url) {
+  if (!isTestMode || isDevMode) return url;
+  const joiner = url.includes("?") ? "&" : "?";
+  return `${url}${joiner}test=1`;
+}
+
 async function renderNetworkInfo() {
   try {
     const response = await fetch("/api/network-info");
     if (!response.ok) throw new Error("network info failed");
     const info = await response.json();
-    lanUrlText.textContent = info.lan?.[0] || info.local || window.location.href;
+    lanUrlText.textContent = withCurrentModeUrl(info.lan?.[0] || info.local || window.location.href);
   } catch (error) {
-    lanUrlText.textContent = window.location.href;
+    lanUrlText.textContent = withCurrentModeUrl(window.location.href);
   }
+}
+
+function phaseLabel(phase) {
+  const labels = {
+    "building-draft": "选地块",
+    "building-reveal": "地块公示",
+    "shop-dealing": "发店铺",
+    "shop-draft": "放店铺/交易",
+    income: "收入结算",
+    final: "最终结算",
+  };
+  return labels[phase] || phase || "未开始";
+}
+
+function setTestStatus(message = "") {
+  if (!testStatus) return;
+  const roomText = room?.code ? `房间 ${room.code}` : "未建房";
+  const gameText = currentGame ? `第${currentGame.round}轮 · ${phaseLabel(currentGame.phase)}` : "等待室";
+  testStatus.textContent = message || `${roomText} · ${gameText}`;
+}
+
+function setupTestTools() {
+  if (!testTools || !isTestMode) return;
+  testTools.hidden = false;
+  document.body.classList.add("test-mode");
+  setTestStatus();
+}
+
+function renderAuditModal(audit) {
+  if (!audit) return;
+  hintLabel.textContent = "测试辅助";
+  hintTitle.textContent = "规则自检";
+  hintContent.innerHTML = `
+    <div class="audit-summary ${audit.ok ? "is-ok" : "has-issues"}">
+      <strong>${audit.ok ? "通过" : "需要检查"}</strong>
+      <span>${escapeHtml(audit.summary || "")}</span>
+    </div>
+    <div class="audit-list">
+      ${(audit.checks || []).map((item) => `
+        <article class="${item.ok ? "is-ok" : "has-issues"}">
+          <b>${item.ok ? "✓" : "!"}</b>
+          <div>
+            <strong>${escapeHtml(item.text)}</strong>
+            ${item.detail ? `<small>${escapeHtml(item.detail)}</small>` : ""}
+          </div>
+        </article>
+      `).join("")}
+    </div>
+  `;
+  openHintModal();
+}
+
+function renderFullAuditModal(fullAudit) {
+  if (!fullAudit) return;
+  hintLabel.textContent = "测试辅助";
+  hintTitle.textContent = "全流程自检";
+  hintContent.innerHTML = `
+    <div class="audit-summary ${fullAudit.ok ? "is-ok" : "has-issues"}">
+      <strong>${fullAudit.ok ? "通过" : "需要检查"}</strong>
+      <span>${escapeHtml(fullAudit.summary || "")}</span>
+    </div>
+    <div class="audit-list full-flow">
+      ${(fullAudit.reports || []).map((report) => {
+        const failed = (report.checks || []).filter((item) => !item.ok);
+        const roundText = (report.rounds || [])
+          .map((round) => `第${round.round}轮 地${round.deal}/${round.keep} 店${round.shops} 已占${round.ownedLots.join("-")}`)
+          .join("；");
+        return `
+          <article class="${report.ok ? "is-ok" : "has-issues"}">
+            <b>${report.ok ? "✓" : "!"}</b>
+            <div>
+              <strong>${escapeHtml(report.playerCount)}人局 · ${escapeHtml(report.summary || "")}</strong>
+              <small>${escapeHtml(roundText)}</small>
+              ${failed.length ? `<small>${escapeHtml(failed.map((item) => `${item.text}${item.detail ? `：${item.detail}` : ""}`).join("；"))}</small>` : ""}
+            </div>
+          </article>
+        `;
+      }).join("")}
+    </div>
+  `;
+  openHintModal();
+}
+
+function applyDebugState(reply, fallbackMessage = "测试指令已执行。") {
+  if (!reply?.ok) {
+    setTestStatus(reply?.error || "测试指令执行失败。");
+    return;
+  }
+
+  if (reply.room) room = reply.room;
+  if (reply.game) {
+    currentGame = reply.game;
+    renderSyncedGameScreen();
+  } else if (room) {
+    renderWaitingRoom();
+    showScreen(waitingScreen);
+  }
+  if (reply.fullAudit) {
+    renderFullAuditModal(reply.fullAudit);
+    setTestStatus(reply.fullAudit.summary);
+  } else if (reply.audit) {
+    renderAuditModal(reply.audit);
+    setTestStatus(reply.audit.summary);
+  } else {
+    setTestStatus(fallbackMessage);
+  }
+}
+
+function runDebugAction(action, payload = {}) {
+  if (!socket || !room?.code) {
+    setTestStatus("先创建房间，再使用测试辅助。");
+    return;
+  }
+
+  if (action === "startGame") {
+    requestImmersiveMode();
+    socket.emit("startGame", { code: room.code }, (reply) => {
+      if (!reply?.ok) {
+        setTestStatus(reply?.error || "开始游戏失败。");
+        return;
+      }
+      setTestStatus("游戏已开始。");
+    });
+    return;
+  }
+
+  socket.emit("debugAction", { code: room.code, action, payload }, (reply) => {
+    applyDebugState(reply);
+  });
 }
 
 function buildLots() {
@@ -652,6 +833,9 @@ function getPlayerStatsText(player) {
 }
 
 function getPlayerCash(player) {
+  const finalScore = currentGame?.finalScores?.find((score) => score.playerId === player?.id);
+  if (finalScore) return Number(finalScore.cash);
+
   const self = getSelfPlayer();
   if (player && self && player.id === self.id && Number.isFinite(Number(currentGame?.cash))) {
     return Number(currentGame.cash);
@@ -2003,6 +2187,9 @@ function applyIncomeSettlement() {
 function applyServerGameState(nextRoom, nextGame) {
   room = nextRoom;
   currentGame = nextGame;
+  if (currentGame.phase !== "final") {
+    finalSettlementShown = false;
+  }
   saveSession();
   selectedBuildingKeeps = new Set(currentGame.keptBuildingIds || []);
   buildingDraftConfirmed = Boolean(currentGame.buildingConfirmed);
@@ -2027,12 +2214,79 @@ function renderSyncedGameScreen() {
   roundLabel.textContent = `${currentGame.round}/6轮`;
   cashLabel.textContent = formatMoney(getPlayerCash(getSelfPlayer()));
   showScreen(gameScreen);
+  showFinalSettlementOnce();
+  setTestStatus();
 }
 
 function getIncomeTotalForPlayer(playerId) {
   return (currentGame?.incomeRows || [])
     .filter((row) => row.playerId === playerId)
     .reduce((total, row) => total + row.income, 0);
+}
+
+function getFinalScores() {
+  if (currentGame?.finalScores?.length) {
+    return currentGame.finalScores;
+  }
+
+  const placedShops = Object.values(currentGame?.placedShops || {});
+  const incomeRows = calculateIncomeRows();
+  return (room?.players || []).map((player) => ({
+    playerId: player.id,
+    name: player.name,
+    color: player.color,
+    cash: getPlayerCash(player),
+    lotCount: getPlayerLotIds(player).length,
+    shopCount: placedShops.filter((shop) => shop.ownerId === player.id).length,
+    completeCount: incomeRows.filter((row) => row.playerId === player.id && row.complete).length,
+  })).sort((a, b) => (
+    b.cash - a.cash
+    || b.completeCount - a.completeCount
+    || b.shopCount - a.shopCount
+    || b.lotCount - a.lotCount
+    || a.name.localeCompare(b.name, "zh-Hans-CN")
+  )).map((score, index) => ({ ...score, rank: index + 1 }));
+}
+
+function renderFinalScoresHtml(scores) {
+  return scores.map((score, index) => `
+    <article class="final-rank-card${index === 0 ? " is-winner" : ""}">
+      <div class="final-rank-medal">${index === 0 ? "胜" : score.rank}</div>
+      <span class="avatar ${score.color}"></span>
+      <div>
+        <strong>${escapeHtml(score.name)}</strong>
+        <small>${score.lotCount} 地块 · ${score.shopCount} 商铺 · ${score.completeCount} 完成</small>
+      </div>
+      <b>${formatMoney(score.cash)}</b>
+    </article>
+  `).join("");
+}
+
+function renderFinalSettlementModal() {
+  const scores = getFinalScores();
+  const winner = scores[0];
+  hintLabel.textContent = "最终结算";
+  hintTitle.textContent = "最终排名";
+  hintContent.innerHTML = `
+    <div class="final-modal-hero">
+      <span>胜者</span>
+      <strong>${escapeHtml(winner?.name || "玩家")}</strong>
+      <b>${formatMoney(winner?.cash || 0)}</b>
+    </div>
+    <div class="final-rank-list">${renderFinalScoresHtml(scores)}</div>
+    <div class="modal-actions">
+      <button class="modal-secondary" data-new-game type="button">新开一局</button>
+      <button class="modal-primary" data-open-info-log type="button">查看记录</button>
+    </div>
+  `;
+  openHintModal();
+}
+
+function showFinalSettlementOnce() {
+  if (currentGame?.phase !== "final" || finalSettlementShown) return;
+
+  finalSettlementShown = true;
+  renderFinalSettlementModal();
 }
 
 function renderIncomePanel() {
@@ -2083,20 +2337,43 @@ function renderIncomePanel() {
 }
 
 function renderFinalPanel() {
-  [...room.players]
-    .sort((a, b) => getPlayerCash(b) - getPlayerCash(a))
-    .forEach((player, index) => {
-      const item = document.createElement("article");
-      item.className = "income-row final";
-      item.innerHTML = `
-        <div>
-          <strong>${index + 1}. ${player.name}</strong>
-          <small>${getPlayerStatsText(player)}</small>
-        </div>
-        <b>${formatMoney(getPlayerCash(player))}</b>
-      `;
-      shopGrid.appendChild(item);
-    });
+  const scores = getFinalScores();
+  const winner = scores[0];
+  const header = document.createElement("div");
+  header.className = "final-card wide";
+  header.innerHTML = `
+    <span>最终胜者</span>
+    <strong>${escapeHtml(winner?.name || "玩家")}</strong>
+    <small>${formatMoney(winner?.cash || 0)}</small>
+  `;
+  shopGrid.appendChild(header);
+
+  scores.forEach((score, index) => {
+    const item = document.createElement("article");
+    item.className = `income-row final${index === 0 ? " is-winner" : ""}`;
+    item.innerHTML = `
+      <div>
+        <strong>${score.rank}. ${escapeHtml(score.name)}</strong>
+        <small>${score.lotCount} 地块 · ${score.shopCount} 商铺 · ${score.completeCount} 完成</small>
+      </div>
+      <b>${formatMoney(score.cash)}</b>
+    `;
+    shopGrid.appendChild(item);
+  });
+
+  const detail = document.createElement("button");
+  detail.type = "button";
+  detail.className = "confirm-draft shop-confirm";
+  detail.textContent = "查看最终结算";
+  detail.addEventListener("click", renderFinalSettlementModal);
+  shopGrid.appendChild(detail);
+
+  const newGame = document.createElement("button");
+  newGame.type = "button";
+  newGame.className = "confirm-draft shop-confirm secondary";
+  newGame.textContent = "新开一局";
+  newGame.addEventListener("click", resetToHome);
+  shopGrid.appendChild(newGame);
 }
 
 function confirmShopPlacement() {
@@ -2182,6 +2459,7 @@ function agreeToAdvanceAfterIncome() {
       renderHand();
       renderShops();
       updateDraftSummary();
+      showFinalSettlementOnce();
     });
     return;
   }
@@ -2208,6 +2486,7 @@ function advanceAfterIncome() {
     renderPlayers();
     renderHand();
     renderShops();
+    showFinalSettlementOnce();
     return;
   }
 
@@ -2373,6 +2652,7 @@ document.querySelector("#createRoomButton").addEventListener("click", () => {
     room = reply.room;
     saveSession();
     renderWaitingRoom();
+    setTestStatus();
     showScreen(waitingScreen);
   });
 });
@@ -2407,13 +2687,13 @@ document.querySelector("#joinRoomButton").addEventListener("click", () => {
     room = reply.room;
     saveSession();
     renderWaitingRoom();
+    setTestStatus();
     showScreen(waitingScreen);
   });
 });
 
 document.querySelector("#backHomeButton").addEventListener("click", () => {
-  room = null;
-  showScreen(homeScreen);
+  resetToHome();
 });
 
 document.querySelector("#startGameButton").addEventListener("click", () => {
@@ -2558,6 +2838,16 @@ hintContent.addEventListener("click", (event) => {
 
   if (event.target.closest("[data-income-next]")) {
     agreeToAdvanceAfterIncome();
+    return;
+  }
+
+  if (event.target.closest("[data-open-info-log]")) {
+    renderInfoModal("log");
+    return;
+  }
+
+  if (event.target.closest("[data-new-game]")) {
+    resetToHome();
   }
 });
 
@@ -2565,6 +2855,21 @@ hintModal.addEventListener("click", (event) => {
   if (event.target === hintModal) {
     closeHintModal();
   }
+});
+
+testToggle?.addEventListener("click", () => {
+  const isOpen = testTools.classList.toggle("is-open");
+  testPanel?.setAttribute("aria-hidden", isOpen ? "false" : "true");
+  setTestStatus();
+});
+
+testTools?.addEventListener("click", (event) => {
+  const actionButton = event.target.closest("[data-test-action]");
+  if (!actionButton) return;
+  event.preventDefault();
+  runDebugAction(actionButton.dataset.testAction, {
+    round: actionButton.dataset.round,
+  });
 });
 
 if (socket) {
@@ -2582,13 +2887,14 @@ if (socket) {
 
         currentPlayerId = reply.selfId;
         room = reply.room;
+        currentGame = reply.game || null;
         saveSession();
 
-        if (reply.game) {
-          currentGame = reply.game;
+        if (currentGame) {
           renderSyncedGameScreen();
         } else if (waitingScreen.classList.contains("is-active")) {
           renderWaitingRoom();
+          setTestStatus();
         }
       });
       return;
@@ -2607,14 +2913,17 @@ if (socket) {
     if (gameScreen.classList.contains("is-active")) {
       renderPlayers();
     }
+    setTestStatus();
   });
 
   socket.on("gameStarted", (payload) => {
     room = payload.room;
     currentGame = payload.game;
+    finalSettlementShown = false;
     saveSession();
     renderStarterWheel();
     showScreen(starterScreen);
+    setTestStatus();
   });
 
   socket.on("gameState", (payload) => {
@@ -2671,6 +2980,7 @@ if (socket) {
       renderPlayers();
       renderHand();
       renderShops();
+      showFinalSettlementOnce();
       return;
     }
 
@@ -2694,6 +3004,7 @@ renderPlayers();
 renderHand();
 renderShops();
 renderNetworkInfo();
+setupTestTools();
 resizeBoardToContain();
 
 if ("serviceWorker" in navigator) {

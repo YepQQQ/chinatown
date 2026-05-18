@@ -379,6 +379,490 @@ function addGameEvent(room, text, type = "system") {
   room.game.eventLog = room.game.eventLog.slice(0, 40);
 }
 
+function isTestSocket(socket) {
+  return socket.handshake.auth?.testMode === "1" || socket.handshake.query?.test === "1";
+}
+
+function assertTestHost(socket, room) {
+  if (!isTestSocket(socket)) return "测试辅助未开启。";
+  if (!room) return "房间不存在。";
+  if (room.hostId !== socket.id) return "只有房主可以使用测试辅助。";
+  return "";
+}
+
+function fillRoomWithTestPlayers(room) {
+  if (room.phase !== "waiting") return "游戏开始后不能补测试玩家。";
+
+  while (room.players.length < room.playerCount) {
+    const id = `bot-${room.code}-${room.players.length + 1}`;
+    room.players.push({
+      id,
+      name: normalizePlayerName("", room),
+      color: colors[room.players.length % colors.length],
+      stats: "0 地块 · 0 商铺",
+      connected: true,
+      isBot: true,
+    });
+  }
+
+  return "";
+}
+
+function autoKeepBuildingDrafts(room) {
+  const game = room.game;
+  if (!game) return "游戏还没开始。";
+  if (game.phase !== "building-draft") return "";
+
+  room.players.forEach((player) => {
+    const draft = game.buildingDrafts[player.id] || [];
+    const selected = draft.slice(0, game.buildingKeepCount).sort((a, b) => a - b);
+    game.buildingSelections[player.id] = selected;
+    game.buildingReady[player.id] = true;
+  });
+
+  room.players.forEach((player) => {
+    const owned = new Set(game.ownedLots[player.id] || []);
+    (game.buildingSelections[player.id] || []).forEach((lotId) => owned.add(lotId));
+    game.ownedLots[player.id] = [...owned].sort((a, b) => a - b);
+    addGameEvent(room, `[测试] ${player.name}保留地块 ${game.buildingSelections[player.id].join("、")}。`, "lot");
+  });
+  refreshBuildingDeck(room);
+  updatePlayerStats(room);
+  game.phase = "building-reveal";
+  return "";
+}
+
+function dealShopDraftsNow(room) {
+  const game = room.game;
+  if (!game) return "游戏还没开始。";
+  const keepError = autoKeepBuildingDrafts(room);
+  if (keepError) return keepError;
+  if (game.phase === "shop-draft") return "";
+  if (game.phase !== "building-reveal") return "当前阶段不能直接发店铺。";
+
+  game.phase = "shop-draft";
+  game.shopReady = {};
+  room.players.forEach((player) => {
+    const existing = game.shopDrafts[player.id] || [];
+    game.shopDrafts[player.id] = [
+      ...existing,
+      ...game.shopDeck.splice(0, game.shopTileDrawCount),
+    ];
+  });
+  addGameEvent(room, `[测试] 第${game.round}轮店铺已发放。`, "shop");
+  return "";
+}
+
+function settleShopDraftNow(room) {
+  const game = room.game;
+  if (!game) return "游戏还没开始。";
+  if (game.phase === "income") return "";
+  const dealError = dealShopDraftsNow(room);
+  if (dealError) return dealError;
+  if (game.phase !== "shop-draft") return "当前阶段不能结算收入。";
+
+  room.players.forEach((player) => {
+    game.shopReady[player.id] = true;
+  });
+  settleIncome(room);
+  room.players.forEach((player) => {
+    const income = (game.incomeRows || [])
+      .filter((row) => row.playerId === player.id)
+      .reduce((total, row) => total + row.income, 0);
+    addGameEvent(room, `[测试] ${player.name}第${game.round}轮收入 +${formatMoney(income)}。`, "income");
+  });
+  game.phase = "income";
+  return "";
+}
+
+function advanceIncomeNow(room) {
+  const game = room.game;
+  if (!game) return "游戏还没开始。";
+  const settleError = settleShopDraftNow(room);
+  if (settleError) return settleError;
+  if (game.phase !== "income") return "当前阶段不能进入下一轮。";
+
+  room.players.forEach((player) => {
+    game.nextRoundReady[player.id] = true;
+  });
+
+  if (game.round >= 6) {
+    game.phase = "final";
+    addGameEvent(room, "[测试] 游戏结束，进入最终结算。", "system");
+  } else {
+    advanceToNextRound(room);
+    addGameEvent(room, `[测试] 进入第${game.round}轮。`, "system");
+  }
+  return "";
+}
+
+function jumpToRound(room, targetRound) {
+  if (!room.game) return "游戏还没开始。";
+  const target = Math.max(1, Math.min(6, Number(targetRound) || 1));
+
+  while (room.game.round < target && room.game.phase !== "final") {
+    const error = advanceIncomeNow(room);
+    if (error) return error;
+  }
+
+  return "";
+}
+
+function finishGameNow(room) {
+  if (!room.game) return "游戏还没开始。";
+
+  while (room.game.phase !== "final") {
+    const error = advanceIncomeNow(room);
+    if (error) return error;
+  }
+
+  return "";
+}
+
+function consumeShopCardsForTest(room, preferredPlayerId, shopId, count) {
+  const game = room.game;
+  const taken = [];
+  const takeFrom = (cards) => {
+    for (let index = cards.length - 1; index >= 0 && taken.length < count; index -= 1) {
+      if (cards[index]?.id !== shopId) continue;
+      taken.push(cards.splice(index, 1)[0]);
+    }
+  };
+
+  takeFrom(game.shopDrafts[preferredPlayerId] || []);
+  takeFrom(game.shopDeck || []);
+  room.players
+    .filter((player) => player.id !== preferredPlayerId)
+    .forEach((player) => takeFrom(game.shopDrafts[player.id] || []));
+
+  return taken.length === count ? taken : null;
+}
+
+function placeTestChain(room, playerId) {
+  const game = room.game;
+  if (!game) return "游戏还没开始。";
+  if (game.phase === "building-draft" || game.phase === "building-reveal") {
+    const error = dealShopDraftsNow(room);
+    if (error) return error;
+  }
+  if (game.phase !== "shop-draft") return "请在店铺阶段生成连锁店铺。";
+
+  const player = room.players.find((item) => item.id === playerId);
+  if (!player) return "没有找到当前玩家。";
+
+  const shop = SHOP_TYPES.find((item) => item.id === "tea") || SHOP_TYPES[0];
+  const lotIds = [6, 7, 8].slice(0, shop.size);
+  const consumed = consumeShopCardsForTest(room, player.id, shop.id, lotIds.length);
+  if (!consumed) return `剩余牌堆里没有足够的${shop.name}。`;
+
+  room.players.forEach((item) => {
+    game.ownedLots[item.id] = (game.ownedLots[item.id] || []).filter((lotId) => !lotIds.includes(Number(lotId)));
+  });
+  game.ownedLots[player.id] = [...new Set([...(game.ownedLots[player.id] || []), ...lotIds])].sort((a, b) => a - b);
+
+  lotIds.forEach((lotId, index) => {
+    const existingShop = game.placedShops[lotId];
+    if (existingShop) {
+      game.shopDeck.push({
+        ...existingShop,
+        cardId: `test-return-${lotId}-${Date.now()}`,
+      });
+    }
+
+    const consumedShop = consumed[index];
+    game.placedShops[lotId] = {
+      id: consumedShop.id,
+      name: consumedShop.name,
+      mark: consumedShop.mark,
+      image: consumedShop.image,
+      size: consumedShop.size,
+      ownerId: player.id,
+      ownerName: player.name,
+    };
+  });
+  refreshBuildingDeck(room);
+  updatePlayerStats(room);
+  addGameEvent(room, `[测试] 为${player.name}生成${shop.name}连锁：${lotIds.join("、")}。`, "shop");
+  return "";
+}
+
+function pushAudit(list, ok, text, detail = "") {
+  list.push({ ok, text, detail });
+}
+
+function auditRoom(room) {
+  const checks = [];
+  const game = room.game;
+  const playerIds = new Set(room.players.map((player) => player.id));
+  const validPhases = new Set(["building-draft", "building-reveal", "shop-draft", "income", "final"]);
+
+  pushAudit(
+    checks,
+    room.players.length === room.playerCount,
+    `玩家人数 ${room.players.length}/${room.playerCount}`,
+    room.players.length === room.playerCount ? "" : "等待室人数和本局人数不一致。",
+  );
+
+  if (!game) {
+    pushAudit(checks, true, "游戏尚未开始", "等待室阶段没有可检查的回合数据。");
+    return {
+      ok: checks.every((item) => item.ok),
+      checks,
+      summary: `通过 ${checks.filter((item) => item.ok).length}/${checks.length}`,
+    };
+  }
+
+  const expectedBuildingRule = BUILDING_CARD_RULES[room.playerCount]?.[game.round - 1];
+  const expectedShopDraw = SHOP_TILE_RULES[room.playerCount]?.[game.round - 1];
+  const phaseOk = validPhases.has(game.phase);
+  pushAudit(checks, phaseOk, `阶段：${game.phase}`, phaseOk ? "" : "当前阶段不在规则流程内。");
+  pushAudit(checks, game.round >= 1 && game.round <= 6, `轮数：${game.round}/6`, "轮数应该在 1 到 6 之间。");
+  pushAudit(
+    checks,
+    !expectedBuildingRule || (
+      game.buildingDealCount === expectedBuildingRule.deal
+      && game.buildingKeepCount === expectedBuildingRule.keep
+    ),
+    `地块发放/保留：${game.buildingDealCount}/${game.buildingKeepCount}`,
+    expectedBuildingRule ? `本轮规则应为 ${expectedBuildingRule.deal}/${expectedBuildingRule.keep}。` : "",
+  );
+  pushAudit(
+    checks,
+    !expectedShopDraw || game.shopTileDrawCount === expectedShopDraw,
+    `店铺发放数量：${game.shopTileDrawCount}`,
+    expectedShopDraw ? `本轮规则应发 ${expectedShopDraw} 张。` : "",
+  );
+
+  const ownedEntries = room.players.flatMap((player) => (
+    (game.ownedLots[player.id] || []).map((lotId) => ({ playerId: player.id, lotId: Number(lotId) }))
+  ));
+  const invalidOwnedLots = ownedEntries.filter(({ lotId }) => !LOTS_BY_ID.has(lotId));
+  const ownedCountByLot = new Map();
+  ownedEntries.forEach(({ lotId }) => {
+    ownedCountByLot.set(lotId, (ownedCountByLot.get(lotId) || 0) + 1);
+  });
+  const duplicatedOwnedLots = [...ownedCountByLot.entries()]
+    .filter(([, count]) => count > 1)
+    .map(([lotId]) => lotId);
+  pushAudit(checks, invalidOwnedLots.length === 0, "地块编号合法", invalidOwnedLots.map((item) => item.lotId).join("、"));
+  pushAudit(checks, duplicatedOwnedLots.length === 0, "玩家地块无重复归属", duplicatedOwnedLots.join("、"));
+
+  const activeDrafts = game.phase === "building-draft"
+    ? Object.values(game.buildingDrafts || {}).flat().map(Number)
+    : [];
+  const deckAndDraft = [...(game.buildingDeck || []).map(Number), ...activeDrafts];
+  const deckDraftSet = new Set(deckAndDraft);
+  const ownedSet = new Set(ownedEntries.map((item) => item.lotId));
+  const deckOverlapOwned = [...deckDraftSet].filter((lotId) => ownedSet.has(lotId));
+  pushAudit(checks, deckAndDraft.length === deckDraftSet.size, "地块牌堆/候选无重复", "当前候选阶段会同时检查候选地块。");
+  pushAudit(checks, deckOverlapOwned.length === 0, "地块牌堆不含已拥有地块", deckOverlapOwned.join("、"));
+
+  const placedEntries = Object.entries(game.placedShops || {}).map(([lotId, shop]) => ({
+    lotId: Number(lotId),
+    shop,
+  }));
+  const misplacedShops = placedEntries.filter(({ lotId, shop }) => (
+    !playerIds.has(shop.ownerId)
+    || !(game.ownedLots[shop.ownerId] || []).map(Number).includes(lotId)
+  ));
+  const invalidShopTypes = placedEntries.filter(({ shop }) => !SHOP_TYPES.some((type) => type.id === shop.id));
+  pushAudit(checks, misplacedShops.length === 0, "地图店铺归属正确", misplacedShops.map((item) => item.lotId).join("、"));
+  pushAudit(checks, invalidShopTypes.length === 0, "地图店铺类型合法", invalidShopTypes.map((item) => item.shop?.name || item.shop?.id).join("、"));
+
+  const shopTypeCounts = Object.fromEntries(SHOP_TYPES.map((shop) => [shop.id, 0]));
+  (game.shopDeck || []).forEach((shop) => {
+    if (shopTypeCounts[shop.id] !== undefined) shopTypeCounts[shop.id] += 1;
+  });
+  Object.values(game.shopDrafts || {}).flat().forEach((shop) => {
+    if (shopTypeCounts[shop.id] !== undefined) shopTypeCounts[shop.id] += 1;
+  });
+  placedEntries.forEach(({ shop }) => {
+    if (shopTypeCounts[shop.id] !== undefined) shopTypeCounts[shop.id] += 1;
+  });
+  const badShopCounts = SHOP_TYPES.filter((shop) => shopTypeCounts[shop.id] !== shop.size + 3);
+  pushAudit(
+    checks,
+    badShopCounts.length === 0,
+    "店铺总张数守恒",
+    badShopCounts.map((shop) => `${shop.name}${shopTypeCounts[shop.id]}/${shop.size + 3}`).join("、"),
+  );
+
+  const finalScoresOk = game.phase !== "final" || getFinalScores(room).length === room.playerCount;
+  pushAudit(checks, finalScoresOk, "最终结算人数正确", "最终排名应包含所有玩家。");
+
+  const failed = checks.filter((item) => !item.ok);
+  return {
+    ok: failed.length === 0,
+    checks,
+    summary: failed.length ? `${failed.length} 项需要检查` : `全部通过 ${checks.length}/${checks.length}`,
+  };
+}
+
+function makeSimRoom(playerCount) {
+  const players = Array.from({ length: playerCount }, (_, index) => ({
+    id: `sim-${playerCount}-${index + 1}`,
+    name: `测试${index + 1}`,
+    color: colors[index % colors.length],
+    stats: "0 地块 · 0 商铺",
+    connected: true,
+    cash: 5,
+  }));
+
+  return {
+    code: `SIM${playerCount}`,
+    playerCount,
+    hostId: players[0].id,
+    phase: "playing",
+    starterId: players[0].id,
+    players,
+  };
+}
+
+function summarizeAuditFailure(audit) {
+  return audit.checks
+    .filter((item) => !item.ok)
+    .map((item) => `${item.text}${item.detail ? `：${item.detail}` : ""}`)
+    .join("；");
+}
+
+function assertSimulationAudit(report, room, label) {
+  const audit = auditRoom(room);
+  report.checks.push({
+    ok: audit.ok,
+    text: label,
+    detail: audit.ok ? audit.summary : summarizeAuditFailure(audit),
+  });
+}
+
+function runSimulatedGameAudit(playerCount) {
+  const room = makeSimRoom(playerCount);
+  room.game = createGame(room);
+  const report = {
+    playerCount,
+    ok: true,
+    rounds: [],
+    checks: [],
+  };
+
+  for (let round = 1; round <= 6; round += 1) {
+    const buildingRule = BUILDING_CARD_RULES[playerCount][round - 1];
+    const shopDraw = SHOP_TILE_RULES[playerCount][round - 1];
+    const draftLengths = room.players.map((player) => (room.game.buildingDrafts[player.id] || []).length);
+    const draftOk = draftLengths.every((length) => length === buildingRule.deal);
+    report.checks.push({
+      ok: draftOk,
+      text: `${playerCount}人局 第${round}轮地块候选`,
+      detail: draftOk ? `${buildingRule.deal}张/人` : `实际 ${draftLengths.join("、")}`,
+    });
+    assertSimulationAudit(report, room, `${playerCount}人局 第${round}轮选地块前`);
+
+    const keepError = autoKeepBuildingDrafts(room);
+    report.checks.push({
+      ok: !keepError,
+      text: `${playerCount}人局 第${round}轮自动保留地块`,
+      detail: keepError || `${buildingRule.keep}张/人`,
+    });
+    assertSimulationAudit(report, room, `${playerCount}人局 第${round}轮地块公示`);
+
+    const dealError = dealShopDraftsNow(room);
+    report.checks.push({
+      ok: !dealError,
+      text: `${playerCount}人局 第${round}轮发店铺`,
+      detail: dealError || `${shopDraw}张/人`,
+    });
+    assertSimulationAudit(report, room, `${playerCount}人局 第${round}轮店铺阶段`);
+
+    const settleError = settleShopDraftNow(room);
+    report.checks.push({
+      ok: !settleError,
+      text: `${playerCount}人局 第${round}轮收入结算`,
+      detail: settleError || "已结算",
+    });
+    assertSimulationAudit(report, room, `${playerCount}人局 第${round}轮收入阶段`);
+
+    report.rounds.push({
+      round,
+      phase: room.game.phase,
+      deal: buildingRule.deal,
+      keep: buildingRule.keep,
+      shops: shopDraw,
+      ownedLots: room.players.map((player) => (room.game.ownedLots[player.id] || []).length),
+      shopHands: room.players.map((player) => (room.game.shopDrafts[player.id] || []).length),
+      deckRemaining: room.game.buildingDeck.length,
+    });
+
+    const advanceError = advanceIncomeNow(room);
+    report.checks.push({
+      ok: !advanceError,
+      text: `${playerCount}人局 第${round}轮推进`,
+      detail: advanceError || (round >= 6 ? "进入最终结算" : `进入第${round + 1}轮`),
+    });
+    assertSimulationAudit(report, room, round >= 6 ? `${playerCount}人局 最终结算` : `${playerCount}人局 第${round + 1}轮准备`);
+  }
+
+  const expectedOwnedTotal = playerCount === 3 ? 75 : 76;
+  const ownedTotal = room.players
+    .reduce((total, player) => total + (room.game.ownedLots[player.id] || []).length, 0);
+  report.checks.push({
+    ok: ownedTotal === expectedOwnedTotal,
+    text: `${playerCount}人局最终地块总数`,
+    detail: `${ownedTotal}/${expectedOwnedTotal}`,
+  });
+  report.checks.push({
+    ok: room.game.phase === "final",
+    text: `${playerCount}人局最终阶段`,
+    detail: room.game.phase,
+  });
+
+  report.ok = report.checks.every((item) => item.ok);
+  report.summary = report.ok
+    ? `${playerCount}人局通过 ${report.checks.length}/${report.checks.length}`
+    : `${playerCount}人局 ${report.checks.filter((item) => !item.ok).length} 项异常`;
+  return report;
+}
+
+function runFullFlowAudit() {
+  const reports = [runSimulatedGameAudit(3), runSimulatedGameAudit(4)];
+  const totalChecks = reports.reduce((total, report) => total + report.checks.length, 0);
+  const failedChecks = reports.reduce((total, report) => (
+    total + report.checks.filter((item) => !item.ok).length
+  ), 0);
+
+  return {
+    ok: failedChecks === 0,
+    reports,
+    summary: failedChecks
+      ? `${failedChecks} 项异常 / ${totalChecks} 项检查`
+      : `3/4人局完整流程通过 ${totalChecks}/${totalChecks}`,
+  };
+}
+
+function getOwnedLotSet(room) {
+  return new Set(Object.values(room.game?.ownedLots || {})
+    .flat()
+    .map(Number));
+}
+
+function refreshBuildingDeck(room) {
+  if (!room?.game) return;
+
+  const ownedLots = getOwnedLotSet(room);
+  room.game.buildingDeck = shuffle(
+    Array.from({ length: 85 }, (_, index) => index + 1)
+      .filter((lotId) => !ownedLots.has(lotId)),
+  );
+}
+
+function dealBuildingDrafts(room, rule) {
+  refreshBuildingDeck(room);
+
+  room.players.forEach((player) => {
+    room.game.buildingDrafts[player.id] = room.game.buildingDeck
+      .splice(0, rule.deal)
+      .sort((a, b) => a - b);
+  });
+}
+
 function advanceToNextRound(room) {
   const game = room.game;
   game.round += 1;
@@ -397,9 +881,7 @@ function advanceToNextRound(room) {
   game.buildingDealCount = buildingRule.deal;
   game.shopTileDrawCount = shopRule;
 
-  room.players.forEach((player) => {
-    game.buildingDrafts[player.id] = game.buildingDeck.splice(0, buildingRule.deal).sort((a, b) => a - b);
-  });
+  dealBuildingDrafts(room, buildingRule);
 }
 
 function createGame(room) {
@@ -471,6 +953,7 @@ function personalGameState(room, playerId) {
     incomeRows: room.game.incomeRows || [],
     incomeSettled: Boolean(room.game.incomeSettled),
     eventLog: room.game.eventLog || [],
+    finalScores: room.game.phase === "final" ? getFinalScores(room) : [],
     shopTileDrawCount: room.game.shopTileDrawCount,
     deckRemaining: room.game.buildingDeck.length,
   };
@@ -661,6 +1144,29 @@ function publicTrade(room, trade) {
   };
 }
 
+function getFinalScores(room) {
+  if (!room?.game) return [];
+
+  const placedShops = Object.values(room.game.placedShops || {});
+  const incomeRows = calculateIncomeRows(room.game);
+
+  return room.players.map((player) => ({
+    playerId: player.id,
+    name: player.name,
+    color: player.color,
+    cash: player.cash ?? 5,
+    lotCount: (room.game.ownedLots[player.id] || []).length,
+    shopCount: placedShops.filter((shop) => shop.ownerId === player.id).length,
+    completeCount: incomeRows.filter((row) => row.playerId === player.id && row.complete).length,
+  })).sort((a, b) => (
+    b.cash - a.cash
+    || b.completeCount - a.completeCount
+    || b.shopCount - a.shopCount
+    || b.lotCount - a.lotCount
+    || a.name.localeCompare(b.name, "zh-Hans-CN")
+  )).map((score, index) => ({ ...score, rank: index + 1 }));
+}
+
 function emitGameStarted(room) {
   room.players.forEach((player) => {
     io.to(player.id).emit("gameStarted", {
@@ -717,6 +1223,59 @@ function leaveCurrentRoom(socket) {
 }
 
 io.on("connection", (socket) => {
+  socket.on("leaveRoom", (reply) => {
+    leaveCurrentRoom(socket);
+    reply?.({ ok: true });
+  });
+
+  socket.on("debugAction", ({ code, action, payload = {} }, reply) => {
+    const room = rooms.get(String(code || "").trim().toUpperCase());
+    const guardError = assertTestHost(socket, room);
+    if (guardError) {
+      reply?.({ ok: false, error: guardError });
+      return;
+    }
+
+    const handlers = {
+      audit: () => "",
+      fullAudit: () => "",
+      fillBots: () => fillRoomWithTestPlayers(room),
+      toShopDraft: () => dealShopDraftsNow(room),
+      autoKeep: () => autoKeepBuildingDrafts(room),
+      placeChain: () => placeTestChain(room, socket.id),
+      settleIncome: () => settleShopDraftNow(room),
+      nextRound: () => advanceIncomeNow(room),
+      jumpToRound: () => jumpToRound(room, payload.round),
+      finishGame: () => finishGameNow(room),
+    };
+    const handler = handlers[action];
+    if (!handler) {
+      reply?.({ ok: false, error: "未知测试指令。" });
+      return;
+    }
+
+    const error = handler();
+    if (error) {
+      reply?.({ ok: false, error });
+      return;
+    }
+
+    updatePlayerStats(room);
+    const response = {
+      ok: true,
+      room: publicRoom(room),
+      game: room.game ? personalGameState(room, socket.id) : null,
+      audit: action === "audit" ? auditRoom(room) : null,
+      fullAudit: action === "fullAudit" ? runFullFlowAudit() : null,
+    };
+    reply?.(response);
+    if (room.game) {
+      emitGameState(room);
+    } else {
+      emitRoom(room);
+    }
+  });
+
   socket.on("resumeRoom", ({ code, playerId }, reply) => {
     const room = rooms.get(String(code || "").trim().toUpperCase());
     const oldId = String(playerId || "");
@@ -877,6 +1436,7 @@ io.on("connection", (socket) => {
         room.game.ownedLots[player.id] = [...owned].sort((a, b) => a - b);
         addGameEvent(room, `${player.name}保留地块 ${room.game.buildingSelections[player.id].join("、")}。`, "lot");
       });
+      refreshBuildingDeck(room);
       updatePlayerStats(room);
       room.game.phase = "building-reveal";
     }
