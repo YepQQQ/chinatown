@@ -37,19 +37,20 @@ const SHOP_TILE_RULES = {
   4: [4, 3, 3, 3, 3, 3],
 };
 
+const CDN = "https://cdn.jsdelivr.net/gh/YepQQQ/chinatown@main";
 const SHOP_TYPES = [
-  { id: "antique", name: "古董店", mark: "古", size: 6, image: "assets/shop-icons/古董店.png" },
-  { id: "photo", name: "照相馆", mark: "照", size: 3, image: "assets/shop-icons/照相馆.png" },
-  { id: "factory", name: "工厂", mark: "工", size: 6, image: "assets/shop-icons/工厂.png" },
-  { id: "clothing", name: "服装店", mark: "服", size: 4, image: "assets/shop-icons/服装店.png" },
-  { id: "laundry", name: "洗衣店", mark: "洗", size: 5, image: "assets/shop-icons/洗衣店.png" },
-  { id: "tea", name: "茶馆", mark: "茶", size: 3, image: "assets/shop-icons/茶馆.png" },
-  { id: "restaurant", name: "饭店", mark: "饭", size: 6, image: "assets/shop-icons/饭店.png" },
-  { id: "pawn", name: "当铺", mark: "当", size: 5, image: "assets/shop-icons/当铺.png" },
-  { id: "florist", name: "花店", mark: "花", size: 4, image: "assets/shop-icons/花店.png" },
-  { id: "dimsum", name: "点心店", mark: "点", size: 5, image: "assets/shop-icons/点心店.png" },
-  { id: "jewelry", name: "珠宝店", mark: "宝", size: 4, image: "assets/shop-icons/珠宝店.png" },
-  { id: "seafood", name: "海鲜店", mark: "鲜", size: 3, image: "assets/shop-icons/海鲜店.png" },
+  { id: "antique", name: "古董店", mark: "古", size: 6, image: `${CDN}/assets/shop-icons/古董店.webp` },
+  { id: "photo", name: "照相馆", mark: "照", size: 3, image: `${CDN}/assets/shop-icons/照相馆.webp` },
+  { id: "factory", name: "工厂", mark: "工", size: 6, image: `${CDN}/assets/shop-icons/工厂.webp` },
+  { id: "clothing", name: "服装店", mark: "服", size: 4, image: `${CDN}/assets/shop-icons/服装店.webp` },
+  { id: "laundry", name: "洗衣店", mark: "洗", size: 5, image: `${CDN}/assets/shop-icons/洗衣店.webp` },
+  { id: "tea", name: "茶馆", mark: "茶", size: 3, image: `${CDN}/assets/shop-icons/茶馆.webp` },
+  { id: "restaurant", name: "饭店", mark: "饭", size: 6, image: `${CDN}/assets/shop-icons/饭店.webp` },
+  { id: "pawn", name: "当铺", mark: "当", size: 5, image: `${CDN}/assets/shop-icons/当铺.webp` },
+  { id: "florist", name: "花店", mark: "花", size: 4, image: `${CDN}/assets/shop-icons/花店.webp` },
+  { id: "dimsum", name: "点心店", mark: "点", size: 5, image: `${CDN}/assets/shop-icons/点心店.webp` },
+  { id: "jewelry", name: "珠宝店", mark: "宝", size: 4, image: `${CDN}/assets/shop-icons/珠宝店.webp` },
+  { id: "seafood", name: "海鲜店", mark: "鲜", size: 3, image: `${CDN}/assets/shop-icons/海鲜店.webp` },
 ];
 
 const INCOME_TABLE = {
