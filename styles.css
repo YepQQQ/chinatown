@@ -2630,6 +2630,10 @@ input {
   pointer-events: none;
 }
 
+.test-tools[hidden] {
+  display: none !important;
+}
+
 .test-toggle,
 .test-panel button {
   border: 1px solid rgba(16, 201, 193, 0.42);

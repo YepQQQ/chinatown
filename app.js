@@ -2955,12 +2955,14 @@ hintModal.addEventListener("click", (event) => {
 });
 
 testToggle?.addEventListener("click", () => {
+  if (!isTestMode) return;
   const isOpen = testTools.classList.toggle("is-open");
   testPanel?.setAttribute("aria-hidden", isOpen ? "false" : "true");
   setTestStatus();
 });
 
 testTools?.addEventListener("click", (event) => {
+  if (!isTestMode) return;
   const actionButton = event.target.closest("[data-test-action]");
   if (!actionButton) return;
   event.preventDefault();
