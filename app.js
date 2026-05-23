@@ -183,19 +183,26 @@ const boardWrap = document.querySelector("#boardWrap");
 const mapMeasure = document.querySelector("#mapMeasure");
 const homeScreen = document.querySelector("#homeScreen");
 const waitingScreen = document.querySelector("#waitingScreen");
-const starterScreen = document.querySelector("#starterScreen");
 const moneyScreen = document.querySelector("#moneyScreen");
+const buildingDealScreen = document.querySelector("#buildingDealScreen");
 const gameScreen = document.querySelector("#gameScreen");
 const nicknameInput = document.querySelector("#nicknameInput");
 const roomCodeInput = document.querySelector("#roomCodeInput");
+const randomNameButton = document.querySelector("#randomNameButton");
+const gameRulesButton = document.querySelector("#gameRulesButton");
+const openJoinRoomButton = document.querySelector("#openJoinRoomButton");
+const joinModal = document.querySelector("#joinModal");
+const closeJoinButton = document.querySelector("#closeJoin");
+const joinError = document.querySelector("#joinError");
 const waitingRoomCode = document.querySelector("#waitingRoomCode");
 const waitingRoomSize = document.querySelector("#waitingRoomSize");
 const waitingPlayers = document.querySelector("#waitingPlayers");
 const waitingStatus = document.querySelector("#waitingStatus");
 const startGameButton = document.querySelector("#startGameButton");
-const starterWheel = document.querySelector("#starterWheel");
-const starterResult = document.querySelector("#starterResult");
+const moneyArt = document.querySelector("#moneyArt");
 const moneyList = document.querySelector("#moneyList");
+const lotDealArt = document.querySelector("#lotDealArt");
+const lotDealList = document.querySelector("#lotDealList");
 const homeError = document.querySelector("#homeError");
 const lanUrlText = document.querySelector("#lanUrlText");
 const roundLabel = document.querySelector("#roundLabel");
@@ -204,6 +211,7 @@ const selectedSummary = document.querySelector("#selectedSummary");
 const cardRow = document.querySelector("#cardRow");
 const draftAction = document.querySelector("#draftAction");
 const shopGrid = document.querySelector("#shopGrid");
+const shopActionRow = document.querySelector("#shopActionRow");
 const playersList = document.querySelector("#playersList");
 const playerCountLabel = document.querySelector("#playerCountLabel");
 const playersButton = document.querySelector("#playersButton");
@@ -320,7 +328,7 @@ function resetToHome() {
 }
 
 function showScreen(screen) {
-  [homeScreen, waitingScreen, starterScreen, moneyScreen, gameScreen].forEach((item) => {
+  [homeScreen, waitingScreen, moneyScreen, buildingDealScreen, gameScreen].forEach((item) => {
     item.classList.toggle("is-active", item === screen);
   });
   document.body.classList.toggle("game-active", screen === gameScreen);
@@ -505,6 +513,10 @@ function setHomeError(message = "") {
   homeError.textContent = message;
 }
 
+function setJoinError(message = "") {
+  if (joinError) joinError.textContent = message;
+}
+
 function isHost() {
   return room && (room.hostId === currentPlayerId || !socket);
 }
@@ -516,6 +528,8 @@ function withCurrentModeUrl(url) {
 }
 
 async function renderNetworkInfo() {
+  if (!lanUrlText) return;
+
   try {
     const response = await fetch("/api/network-info");
     if (!response.ok) throw new Error("network info failed");
@@ -998,6 +1012,42 @@ function renderIncomeHint() {
   hintContent.innerHTML = getIncomeHintHtml();
 }
 
+function getGameRulesHtml() {
+  return `
+    <div class="rules-panel">
+      <section>
+        <h3>目标</h3>
+        <p>游戏共 6 轮。玩家通过交易地块、店铺和现金，建立相邻的同类店铺。最终现金最多的玩家获胜。</p>
+      </section>
+      <section>
+        <h3>每轮流程</h3>
+        <ol>
+          <li>发放候选地块，玩家按规则保留指定数量。</li>
+          <li>公示所有玩家保留的地块，并在地图上标记归属。</li>
+          <li>发放店铺，玩家可以自由谈判交易。</li>
+          <li>在自己的空地块上放置店铺，已放置的店铺不能移动。</li>
+          <li>所有玩家同意后结算本轮收入，再进入下一轮。</li>
+        </ol>
+      </section>
+      <section>
+        <h3>交易</h3>
+        <p>地块、手上店铺、现金都可以交易。现金信息对其他玩家保密，交易时可以提出任意金额。</p>
+      </section>
+      <section>
+        <h3>店铺规模</h3>
+        <p>相同店铺必须正交相邻才算同一组，对角不算。达到店铺图标上的规模数字即为完成店铺。</p>
+      </section>
+      ${getIncomeHintHtml()}
+    </div>
+  `;
+}
+
+function renderRulesModal() {
+  hintLabel.textContent = "游戏规则";
+  hintTitle.textContent = "怎么玩";
+  hintContent.innerHTML = getGameRulesHtml();
+}
+
 function renderEventLog() {
   const events = currentGame?.eventLog || [];
   if (!events.length) {
@@ -1037,6 +1087,17 @@ function openHintModal() {
 
 function closeHintModal() {
   hintModal.setAttribute("aria-hidden", "true");
+}
+
+function openJoinModal() {
+  setHomeError();
+  setJoinError();
+  joinModal.setAttribute("aria-hidden", "false");
+  roomCodeInput.focus();
+}
+
+function closeJoinModal() {
+  joinModal.setAttribute("aria-hidden", "true");
 }
 
 function renderRoundAdvanceConfirm() {
@@ -1141,86 +1202,87 @@ function renderPlayers() {
 }
 
 function renderWaitingRoom() {
-  waitingRoomCode.textContent = `房间 ${room.code}`;
-  waitingRoomSize.textContent = `${room.playerCount}人局`;
-  waitingPlayers.innerHTML = "";
+  const currentCount = room.players.length;
+  const maxPlayers = room.maxPlayers || 4;
+  const canStart = currentCount >= 3 && currentCount <= maxPlayers;
+  const isFull = currentCount >= maxPlayers;
 
+  waitingRoomCode.textContent = room.code;
+  waitingPlayers.innerHTML = "";
+  waitingPlayers.dataset.count = String(Math.min(Math.max(currentCount, 1), 4));
   room.players.forEach((player, index) => {
     const item = document.createElement("article");
-    item.className = "waiting-player";
+    item.className = "room-player-card";
     item.innerHTML = `
-      <span><i class="avatar ${player.color}"></i><strong>${player.name}</strong></span>
-      <small>${index === 0 ? "房主" : "已加入"}</small>
+      <img src="assets/room-player-${index + 1}.png" alt="" />
+      <strong class="room-player-name">${player.name}</strong>
+      <span class="room-player-role">${index === 0 ? "房主" : "已加入"}</span>
     `;
     waitingPlayers.appendChild(item);
   });
 
-  const currentCount = room.players.length;
-  const isFull = currentCount === room.playerCount;
+  waitingRoomSize.textContent = room.phase === "playing"
+    ? `${room.playerCount}人局`
+    : `${currentCount}/${maxPlayers} 人`;
   startGameButton.hidden = !isHost();
-  startGameButton.disabled = !isFull;
+  startGameButton.disabled = !canStart;
 
   if (!isHost()) {
-    waitingStatus.textContent = `已加入 ${currentCount}/${room.playerCount}，等待房主开始。`;
+    waitingStatus.textContent = `已加入 ${currentCount}/${maxPlayers}，等待房主开始。`;
+  } else if (!canStart) {
+    waitingStatus.textContent = `已加入 ${currentCount}/${maxPlayers}，至少 3 人即可开始。`;
   } else if (!isFull) {
-    waitingStatus.textContent = `已加入 ${currentCount}/${room.playerCount}，人数满后可以开始。`;
+    waitingStatus.textContent = `已加入 ${currentCount}/${maxPlayers}，可以开始，也可以继续等第 4 人。`;
   } else {
-    waitingStatus.textContent = "人数已满，可以开始游戏。";
+    waitingStatus.textContent = "4 人已满，可以开始游戏。";
   }
-}
-
-function getStarterPlayer() {
-  return room?.players.find((player) => player.id === room.starterId) || room?.players[0];
-}
-
-function renderStarterWheel() {
-  const starter = getStarterPlayer();
-  const starterIndex = Math.max(0, room.players.findIndex((player) => player.id === starter?.id));
-  const angleStep = 360 / room.players.length;
-  const ringStops = room.players.map((player, index) => {
-    const start = index * angleStep;
-    const end = start + angleStep;
-    const gapStart = Math.max(start, end - 1.8);
-    return `${playerRingColors[player.color] || "rgba(214, 167, 58, 0.74)"} ${start}deg ${gapStart}deg, rgba(245, 211, 129, 0.92) ${gapStart}deg ${end}deg`;
-  }).join(", ");
-
-  starterWheel.style.setProperty("--starter-angle", `${starterIndex * angleStep + angleStep / 2}deg`);
-  starterWheel.style.setProperty("--ring-bg", `conic-gradient(${ringStops})`);
-  starterWheel.innerHTML = `
-    <div class="starter-player-ring" aria-hidden="true"></div>
-    <div class="starter-wheel-core" aria-hidden="true"></div>
-    ${room.players.map((player, index) => `
-      <span class="starter-name ${player.color}" style="--label-angle: ${index * angleStep + angleStep / 2}deg">
-        ${player.name}
-      </span>
-    `).join("")}
-  `;
-  starterResult.textContent = "转盘转动中...";
-  starterWheel.classList.remove("is-spinning");
-
-  requestAnimationFrame(() => {
-    starterWheel.classList.add("is-spinning");
-  });
-
-  window.setTimeout(() => {
-    starterResult.textContent = `${starter.name} 成为本局起始玩家`;
-    window.setTimeout(showMoneyIntro, 650);
-  }, 1850);
 }
 
 function showMoneyIntro() {
   moneyList.innerHTML = "";
+  moneyArt.dataset.count = String(room.players.length);
 
   room.players.forEach((player, index) => {
     const row = document.createElement("article");
-    row.className = "money-row";
+    row.className = "money-row money-name";
     row.style.animationDelay = `${index * 180}ms`;
-    row.innerHTML = `<strong>${player.name}</strong><b>+$50,000</b>`;
+    row.textContent = player.name;
     moneyList.appendChild(row);
   });
 
   showScreen(moneyScreen);
-  window.setTimeout(showBuildingDraft, 1500 + room.players.length * 180);
+  window.setTimeout(showBuildingDealIntro, 1500 + room.players.length * 180);
+}
+
+function lotCardImagePath(lotId) {
+  return `assets/lots/${String(lotId).padStart(2, "0")}.png`;
+}
+
+function showBuildingDealIntro() {
+  const cards = currentGame?.buildingCards || [];
+  lotDealList.innerHTML = "";
+  lotDealArt.dataset.count = String(cards.length);
+
+  cards.forEach((lotId, index) => {
+    const card = document.createElement("article");
+    card.className = "lot-deal-card";
+    card.style.animationDelay = `${index * 95}ms`;
+
+    const image = document.createElement("img");
+    image.src = lotCardImagePath(lotId);
+    image.alt = `${lotId}号地块`;
+    card.appendChild(image);
+
+    lotDealList.appendChild(card);
+  });
+
+  if (!cards.length) {
+    showBuildingDraft();
+    return;
+  }
+
+  showScreen(buildingDealScreen);
+  window.setTimeout(showBuildingDraft, 1180 + cards.length * 115);
 }
 
 function showBuildingDraft() {
@@ -1390,6 +1452,7 @@ function renderHand() {
 
 function renderShops() {
   shopGrid.innerHTML = "";
+  shopActionRow.innerHTML = "";
   const heldShopCards = currentGame?.shopCards || [];
 
   if (currentGame?.phase === "building-draft") {
@@ -1480,7 +1543,7 @@ function renderShopPlacementAction() {
     ? `已确认 · 等待 ${currentGame.shopReadyCount || 1}/${room.playerCount}`
     : remaining ? `进入下一轮 · 保留 ${remaining} 张` : "进入下一轮";
   action.addEventListener("click", confirmShopPlacement);
-  shopGrid.appendChild(action);
+  shopActionRow.appendChild(action);
 }
 
 function makeShopCandidates(count, offset = 0) {
@@ -1697,6 +1760,13 @@ function groupShopCards(cards = []) {
     || shopCatalog.findIndex((shop) => shop.id === a.id) - shopCatalog.findIndex((shop) => shop.id === b.id)
     || a.name.localeCompare(b.name, "zh-Hans-CN")
   ));
+}
+
+function shopHandSignature(cards = []) {
+  return cards
+    .map((shop) => shop.id)
+    .sort()
+    .join("|");
 }
 
 function toggleTradeSet(setName, value) {
@@ -2251,13 +2321,15 @@ function getFinalScores() {
 function renderFinalScoresHtml(scores) {
   return scores.map((score, index) => `
     <article class="final-rank-card${index === 0 ? " is-winner" : ""}">
-      <div class="final-rank-medal">${index === 0 ? "胜" : score.rank}</div>
-      <span class="avatar ${score.color}"></span>
-      <div>
-        <strong>${escapeHtml(score.name)}</strong>
-        <small>${score.lotCount} 地块 · ${score.shopCount} 商铺 · ${score.completeCount} 完成</small>
+      <div class="final-rank-main">
+        <strong>${score.rank}. ${escapeHtml(score.name)}</strong>
+        <b>${formatMoney(score.cash)}</b>
       </div>
-      <b>${formatMoney(score.cash)}</b>
+      <div class="final-rank-stats">
+        <span>${score.lotCount}地块</span>
+        <span>${score.shopCount}店铺</span>
+        <span>${score.completeCount}完成</span>
+      </div>
     </article>
   `).join("");
 }
@@ -2350,13 +2422,17 @@ function renderFinalPanel() {
 
   scores.forEach((score, index) => {
     const item = document.createElement("article");
-    item.className = `income-row final${index === 0 ? " is-winner" : ""}`;
+    item.className = `final-rank-card side-final${index === 0 ? " is-winner" : ""}`;
     item.innerHTML = `
-      <div>
+      <div class="final-rank-main">
         <strong>${score.rank}. ${escapeHtml(score.name)}</strong>
-        <small>${score.lotCount} 地块 · ${score.shopCount} 商铺 · ${score.completeCount} 完成</small>
+        <b>${formatMoney(score.cash)}</b>
       </div>
-      <b>${formatMoney(score.cash)}</b>
+      <div class="final-rank-stats">
+        <span>${score.lotCount}地块</span>
+        <span>${score.shopCount}店铺</span>
+        <span>${score.completeCount}完成</span>
+      </div>
     `;
     shopGrid.appendChild(item);
   });
@@ -2510,14 +2586,8 @@ function advanceAfterIncome() {
   buildingDraftConfirmed = false;
   selectedShopCardId = null;
   clearSelection();
-  applyPublicLotsToBoard(currentGame.publicLots || []);
-  renderPlayers();
-  renderHand();
-  renderShops();
-  roundLabel.textContent = `${currentGame.round}/6轮`;
-  cashLabel.textContent = formatMoney(getPlayerCash(getSelfPlayer()));
-  selectedSummary.textContent = `第${currentGame.round}轮 · 候选 ${currentGame.buildingDealCount} 保留 ${currentGame.buildingKeepCount}`;
   activateTab("cards");
+  showBuildingDealIntro();
 }
 
 function removeOneShopCard(shopId) {
@@ -2620,14 +2690,6 @@ document.querySelectorAll(".tab").forEach((tab) => {
   });
 });
 
-document.querySelectorAll(".room-size-option").forEach((option) => {
-  option.addEventListener("click", () => {
-    document.querySelectorAll(".room-size-option").forEach((item) => item.classList.remove("is-active"));
-    option.classList.add("is-active");
-    selectedRoomSize = Number(option.dataset.size);
-  });
-});
-
 document.querySelector("#createRoomButton").addEventListener("click", () => {
   setHomeError();
 
@@ -2641,7 +2703,6 @@ document.querySelector("#createRoomButton").addEventListener("click", () => {
 
   socket.emit("createRoom", {
     nickname: nicknameInput.value.trim(),
-    playerCount: selectedRoomSize,
   }, (reply) => {
     if (!reply?.ok) {
       setHomeError(reply?.error || "创建房间失败。");
@@ -2657,12 +2718,32 @@ document.querySelector("#createRoomButton").addEventListener("click", () => {
   });
 });
 
+randomNameButton?.addEventListener("pointerdown", (event) => {
+  event.preventDefault();
+  nicknameInput.blur();
+});
+
+randomNameButton?.addEventListener("click", (event) => {
+  event.preventDefault();
+  const name = makeDefaultNickname([nicknameInput.value.trim()]);
+  nicknameInput.value = name;
+  nicknameInput.blur();
+});
+
+gameRulesButton?.addEventListener("click", () => {
+  renderRulesModal();
+  openHintModal();
+});
+
+openJoinRoomButton?.addEventListener("click", openJoinModal);
+
 document.querySelector("#joinRoomButton").addEventListener("click", () => {
   setHomeError();
   const code = roomCodeInput.value.trim().toUpperCase();
 
   if (!code) {
-    setHomeError("请先输入房间码。");
+    setJoinError("请先输入房间码。");
+    openJoinModal();
     return;
   }
 
@@ -2670,6 +2751,7 @@ document.querySelector("#joinRoomButton").addEventListener("click", () => {
     room = makeRoom(3, code);
     currentPlayerId = "local-host";
     renderWaitingRoom();
+    closeJoinModal();
     showScreen(waitingScreen);
     return;
   }
@@ -2679,7 +2761,8 @@ document.querySelector("#joinRoomButton").addEventListener("click", () => {
     code,
   }, (reply) => {
     if (!reply?.ok) {
-      setHomeError(reply?.error || "加入房间失败。");
+      setJoinError(reply?.error || "加入房间失败。");
+      openJoinModal();
       return;
     }
 
@@ -2688,8 +2771,24 @@ document.querySelector("#joinRoomButton").addEventListener("click", () => {
     saveSession();
     renderWaitingRoom();
     setTestStatus();
+    closeJoinModal();
     showScreen(waitingScreen);
   });
+});
+
+roomCodeInput?.addEventListener("keydown", (event) => {
+  if (event.key === "Enter") {
+    event.preventDefault();
+    document.querySelector("#joinRoomButton").click();
+  }
+});
+
+closeJoinButton?.addEventListener("click", closeJoinModal);
+
+joinModal?.addEventListener("click", (event) => {
+  if (event.target === joinModal || event.target.closest("[data-join-close]")) {
+    closeJoinModal();
+  }
 });
 
 document.querySelector("#backHomeButton").addEventListener("click", () => {
@@ -2701,10 +2800,8 @@ document.querySelector("#startGameButton").addEventListener("click", () => {
 
   if (!socket) {
     room.phase = "playing";
-    room.starterId = room.players[Math.floor(Math.random() * room.players.length)].id;
     currentGame = makeLocalGame();
-    renderStarterWheel();
-    showScreen(starterScreen);
+    showMoneyIntro();
     return;
   }
 
@@ -2921,14 +3018,19 @@ if (socket) {
     currentGame = payload.game;
     finalSettlementShown = false;
     saveSession();
-    renderStarterWheel();
-    showScreen(starterScreen);
+    showMoneyIntro();
     setTestStatus();
   });
 
   socket.on("gameState", (payload) => {
     const previousPhase = currentGame?.phase;
+    const previousShopHand = shopHandSignature(currentGame?.shopCards || []);
+    const previousShopReadyCount = currentGame?.shopReadyCount || 0;
+    const previousShopPlacementConfirmed = Boolean(currentGame?.shopPlacementConfirmed);
     applyServerGameState(payload.room, payload.game);
+    const selfShopHandChanged = previousShopHand !== shopHandSignature(currentGame?.shopCards || []);
+    const shopProgressChanged = previousShopReadyCount !== (currentGame?.shopReadyCount || 0)
+      || previousShopPlacementConfirmed !== Boolean(currentGame?.shopPlacementConfirmed);
 
     if (currentGame.phase === "building-reveal") {
       activateTab("cards");
@@ -2966,10 +3068,7 @@ if (socket) {
       selectedShopCardId = null;
       clearSelection();
       activateTab("cards");
-      renderPlayers();
-      renderHand();
-      renderShops();
-      selectedSummary.textContent = `第${currentGame.round}轮 · 候选 ${currentGame.buildingDealCount} 保留 ${currentGame.buildingKeepCount}`;
+      showBuildingDealIntro();
       return;
     }
 
@@ -2986,7 +3085,9 @@ if (socket) {
 
     renderPlayers();
     renderHand();
-    renderShops();
+    if (currentGame.phase !== "shop-draft" || previousPhase !== "shop-draft" || selfShopHandChanged || shopProgressChanged) {
+      renderShops();
+    }
     updateDraftSummary();
   });
 
@@ -3023,11 +3124,9 @@ if (isCoordMode) {
 if (isDevMode) {
   room = makeRoom(devPlayerCount, "DEV1");
   room.phase = "playing";
-  room.starterId = room.players[0].id;
   currentPlayerId = "local-host";
   currentGame = makeDevGame();
-  renderStarterWheel();
-  showScreen(starterScreen);
+  showMoneyIntro();
   if (params.get("trade") === "1") {
     window.setTimeout(openTradeModal, 5200);
   }

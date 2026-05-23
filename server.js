@@ -112,6 +112,13 @@ app.get("/api/network-info", (req, res) => {
   });
 });
 
+app.get("/api/health", (req, res) => {
+  res.json({
+    ok: true,
+    rooms: rooms.size,
+  });
+});
+
 function makeRoomCode() {
   let code = "";
 
@@ -126,6 +133,7 @@ function publicRoom(room) {
   return {
     code: room.code,
     playerCount: room.playerCount,
+    maxPlayers: room.maxPlayers || 4,
     hostId: room.hostId,
     phase: room.phase,
     starterId: room.starterId,
@@ -1302,31 +1310,26 @@ io.on("connection", (socket) => {
     emitGameState(room);
   });
 
-  socket.on("createRoom", ({ nickname, playerCount }, reply) => {
+  socket.on("createRoom", ({ nickname }, reply) => {
     leaveCurrentRoom(socket);
 
-    const count = Number(playerCount);
-    if (![3, 4].includes(count)) {
-      reply?.({ ok: false, error: "只能创建 3 人局或 4 人局。" });
-      return;
-    }
-
     const code = makeRoomCode();
+    const hostName = normalizePlayerName(nickname, { players: [] });
     const room = {
       code,
-      playerCount: count,
+      playerCount: 4,
+      maxPlayers: 4,
       hostId: socket.id,
       phase: "waiting",
       players: [
         {
           id: socket.id,
-          name: String(nickname || "玩家").slice(0, 8),
+          name: hostName,
           color: colors[0],
           stats: "0 地块 · 0 商铺",
         },
       ],
     };
-    room.players[0].name = normalizePlayerName(nickname, room);
 
     rooms.set(code, room);
     socket.join(code);
@@ -1352,7 +1355,7 @@ io.on("connection", (socket) => {
       return;
     }
 
-    if (room.players.length >= room.playerCount) {
+    if (room.players.length >= (room.maxPlayers || 4)) {
       reply?.({ ok: false, error: "房间已经满员。" });
       return;
     }
@@ -1384,19 +1387,19 @@ io.on("connection", (socket) => {
       return;
     }
 
-    if (room.players.length !== room.playerCount) {
-      reply?.({ ok: false, error: "人数未满，暂时不能开始。" });
+    if (![3, 4].includes(room.players.length)) {
+      reply?.({ ok: false, error: "需要 3 到 4 名玩家才能开始。" });
       return;
     }
 
     room.phase = "playing";
-    room.starterId = room.players[Math.floor(Math.random() * room.players.length)].id;
+    room.playerCount = room.players.length;
+    room.starterId = null;
     room.players.forEach((player) => {
       player.cash = 5;
     });
     room.game = createGame(room);
-    const starter = room.players.find((player) => player.id === room.starterId);
-    addGameEvent(room, `游戏开始，${starter?.name || "玩家"}成为起始玩家。`, "system");
+    addGameEvent(room, "游戏开始，系统发放初始资金。", "system");
     reply?.({ ok: true, room: publicRoom(room), game: personalGameState(room, socket.id) });
     emitGameStarted(room);
   });

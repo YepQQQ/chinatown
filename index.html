@@ -6,92 +6,48 @@
     <meta name="theme-color" content="#080503" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-title" content="霓虹唐埠" />
+    <meta name="apple-mobile-web-app-title" content="唐人街" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <title>霓虹唐埠 - 手机原型 P0</title>
+    <title>唐人街 - 手机原型 P0</title>
     <link rel="manifest" href="/manifest.webmanifest" />
-    <link rel="icon" href="/assets/app-icon.svg" />
-    <link rel="stylesheet" href="styles.css?v=full-audit-1" />
+    <link rel="icon" href="/assets/chinatown-logo.png" />
+    <link rel="stylesheet" href="styles.css?v=shop-scroll-1" />
   </head>
   <body>
     <main class="entry-shell screen is-active" id="homeScreen">
-      <section class="entry-panel">
-        <div class="brand-block">
-          <span class="label">私人朋友局原型</span>
-          <h1>霓虹唐埠</h1>
-          <p>先创建房间，确认 3/4 人局，进入等待室后再开始游戏。</p>
-        </div>
-
-        <div class="network-card" id="networkCard">
-          <span class="label">手机访问</span>
-          <strong id="lanUrlText">正在获取局域网地址...</strong>
-          <small>手机和电脑需要连同一个 Wi-Fi。</small>
-        </div>
-
-        <label class="field">
-          <span class="label">你的昵称</span>
+      <section class="home-art" aria-label="唐人街首页">
+        <span id="lanUrlText" hidden>正在获取局域网地址...</span>
+        <label class="home-name-field" aria-label="你的昵称">
           <input id="nicknameInput" maxlength="8" value="你" />
         </label>
-
-        <div class="field">
-          <span class="label">创建房间人数</span>
-          <div class="room-size" aria-label="创建房间人数">
-            <button class="room-size-option is-active" data-size="3" type="button">3人局</button>
-            <button class="room-size-option" data-size="4" type="button">4人局</button>
-          </div>
-        </div>
-
-        <button class="primary-action" id="createRoomButton" type="button">创建房间</button>
-
-        <p class="form-error" id="homeError" aria-live="polite"></p>
-
-        <div class="join-row">
-          <input id="roomCodeInput" maxlength="6" placeholder="输入房间码" />
-          <button class="ghost-action" id="joinRoomButton" type="button">加入</button>
-        </div>
+        <button class="home-hotspot name-dice-hotspot" id="randomNameButton" type="button" aria-label="随机昵称"></button>
+        <button class="home-hotspot rules-hotspot" id="gameRulesButton" type="button" aria-label="游戏规则"></button>
+        <button class="home-hotspot join-hotspot" id="openJoinRoomButton" type="button" aria-label="加入房间"></button>
+        <button class="home-hotspot create-hotspot" id="createRoomButton" type="button" aria-label="创建房间"></button>
+        <p class="form-error home-error" id="homeError" aria-live="polite"></p>
       </section>
     </main>
 
     <main class="entry-shell screen" id="waitingScreen">
-      <section class="entry-panel">
-        <div class="waiting-head">
-          <div>
-            <span class="label">等待室</span>
-            <h1 id="waitingRoomCode">房间 ----</h1>
-          </div>
-          <strong id="waitingRoomSize">3人局</strong>
-        </div>
-
-        <div class="waiting-list" id="waitingPlayers"></div>
+      <section class="room-waiting-art" aria-label="房间等待室">
+        <strong id="waitingRoomSize" hidden>等待室</strong>
+        <h1 class="room-code-value" id="waitingRoomCode">----</h1>
+        <div class="waiting-list room-player-stage" id="waitingPlayers" aria-label="已加入玩家"></div>
         <p class="waiting-status" id="waitingStatus">等待朋友加入。</p>
-
-        <button class="primary-action" id="startGameButton" type="button">开始游戏</button>
-        <button class="ghost-action" id="backHomeButton" type="button">返回首页</button>
-      </section>
-    </main>
-
-    <main class="entry-shell screen" id="starterScreen">
-      <section class="entry-panel starter-panel">
-        <div class="brand-block">
-          <span class="label">决定起始玩家</span>
-          <h1>先手转盘</h1>
-          <p>系统会随机决定本局起始玩家。后续每轮起始玩家按顺时针传递。</p>
-        </div>
-
-        <div class="starter-wheel" id="starterWheel"></div>
-        <p class="starter-result" id="starterResult">转盘准备中...</p>
+        <button class="room-hotspot room-back-hotspot" id="backHomeButton" type="button" aria-label="返回首页">返回首页</button>
+        <button class="room-hotspot room-start-hotspot" id="startGameButton" type="button" aria-label="开始游戏">开始游戏</button>
       </section>
     </main>
 
     <main class="entry-shell screen" id="moneyScreen">
-      <section class="entry-panel money-panel">
-        <div class="brand-block">
-          <span class="label">开局资金</span>
-          <h1>资金入账</h1>
-          <p>每位玩家获得 $50,000 起始资金。</p>
-        </div>
-
+      <section class="money-art" id="moneyArt" aria-label="初始资金发放">
         <div class="money-list" id="moneyList"></div>
+      </section>
+    </main>
+
+    <main class="entry-shell screen" id="buildingDealScreen">
+      <section class="lot-deal-art" id="lotDealArt" aria-label="地块发放">
+        <div class="lot-deal-list" id="lotDealList"></div>
       </section>
     </main>
 
@@ -149,6 +105,7 @@
 
           <div class="tab-panel" id="shops">
             <div class="shop-grid" id="shopGrid"></div>
+            <div class="shop-action-row" id="shopActionRow"></div>
           </div>
         </section>
 
@@ -179,6 +136,28 @@
           <button id="closeHint" type="button">关闭</button>
         </div>
         <div class="hint-content" id="hintContent">提示内容待补充。你后面提供具体文案后，我会放到这里。</div>
+      </section>
+    </div>
+
+    <div class="modal-backdrop" id="joinModal" aria-hidden="true">
+      <section class="hint-modal join-modal" role="dialog" aria-modal="true" aria-labelledby="joinTitle">
+        <div class="hint-head">
+          <div>
+            <span class="label">加入已有房间</span>
+            <h2 id="joinTitle">输入房间号</h2>
+          </div>
+          <button id="closeJoin" type="button">关闭</button>
+        </div>
+        <label class="join-code-field">
+          <span>房间号</span>
+          <input id="roomCodeInput" maxlength="6" placeholder="例如 A1B2" />
+        </label>
+        <p class="form-error join-error" id="joinError" aria-live="polite"></p>
+        <p class="hint-note">房间号由房主在等待室页面查看并告诉你。</p>
+        <div class="modal-actions">
+          <button class="modal-secondary" data-join-close type="button">取消</button>
+          <button class="modal-primary" id="joinRoomButton" type="button">加入房间</button>
+        </div>
       </section>
     </div>
 
@@ -220,6 +199,6 @@
     </aside>
 
     <script src="/socket.io/socket.io.js"></script>
-    <script src="app.js?v=full-audit-1"></script>
+    <script src="app.js?v=shop-scroll-1"></script>
   </body>
 </html>

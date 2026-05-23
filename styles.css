@@ -1,5 +1,7 @@
 :root {
   color-scheme: dark;
+  --ui-font: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", system-ui, sans-serif;
+  --title-font: "Songti SC", "Noto Serif SC", Georgia, serif;
   --ink: #0b0805;
   --panel: rgba(28, 18, 9, 0.86);
   --panel-2: rgba(55, 36, 18, 0.72);
@@ -29,7 +31,8 @@ body {
     radial-gradient(circle at 92% 10%, rgba(16, 201, 193, 0.14), transparent 28%),
     linear-gradient(145deg, #070503 0%, #171009 52%, #070503 100%);
   color: var(--paper);
-  font-family: "Songti SC", "Noto Serif SC", Georgia, serif;
+  font-family: var(--ui-font);
+  font-variant-numeric: tabular-nums;
 }
 
 body::before {
@@ -76,54 +79,402 @@ input {
 }
 
 .entry-shell {
-  width: min(100vw, 430px);
+  width: min(100vw, 980px);
   height: 100svh;
   margin: 0 auto;
-  padding: max(14px, env(safe-area-inset-top)) 12px max(14px, env(safe-area-inset-bottom));
+  padding: max(12px, env(safe-area-inset-top)) 14px max(12px, env(safe-area-inset-bottom));
   place-items: center;
 }
 
 .entry-panel {
   width: 100%;
-  padding: 18px;
+  height: min(360px, calc(100svh - 24px));
+  max-height: calc(100svh - 24px);
+  overflow: hidden;
+  padding: 10px;
   border: 1px solid var(--line);
   border-radius: 10px;
-  background: var(--panel);
+  background:
+    radial-gradient(circle at 10% 0%, rgba(214, 82, 62, 0.16), transparent 42%),
+    linear-gradient(135deg, rgba(43, 27, 10, 0.92), rgba(14, 9, 4, 0.9));
   box-shadow: var(--shadow);
   backdrop-filter: blur(18px);
 }
 
+.home-art {
+  position: relative;
+  width: min(calc(100vw - 28px), 980px);
+  height: min(calc(100svh - 24px), 554px);
+  overflow: hidden;
+  border-radius: 10px;
+  background:
+    linear-gradient(180deg, rgba(0, 0, 0, 0.06), rgba(0, 0, 0, 0.18)),
+    url("assets/chinatown-home.png?v=4") center / cover no-repeat;
+  box-shadow: var(--shadow);
+}
+
+.home-name-field {
+  position: absolute;
+  left: 33.3%;
+  top: 64.5%;
+  display: block;
+  width: 25.4%;
+  height: 9.6%;
+  min-height: 0;
+  z-index: 1;
+}
+
+.home-name-field input {
+  min-height: 0;
+  height: 100%;
+  border: 0;
+  padding: 0 3%;
+  outline: 0;
+  background: transparent;
+  color: #fff7d0;
+  font: 700 clamp(10px, 2.05svh, 17px)/1 var(--title-font);
+  text-align: center;
+  letter-spacing: 0;
+  text-shadow:
+    0 2px 5px rgba(0, 0, 0, 0.62),
+    0 0 10px rgba(255, 237, 181, 0.16);
+}
+
+.home-name-field input::selection {
+  color: #18210d;
+  background: rgba(255, 229, 150, 0.82);
+}
+
+.home-hotspot {
+  position: absolute;
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 14px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.home-hotspot:focus-visible,
+.name-dice-hotspot:focus-visible,
+.home-name-field:focus-within {
+  outline: 2px solid rgba(255, 238, 178, 0.88);
+  outline-offset: 2px;
+}
+
+.name-dice-hotspot {
+  left: 63.8%;
+  top: 61.95%;
+  width: 7.2%;
+  height: 10.7%;
+  z-index: 2;
+  touch-action: manipulation;
+}
+
+.rules-hotspot {
+  left: 14.5%;
+  top: 80.5%;
+  width: 25.4%;
+  height: 13.4%;
+}
+
+.join-hotspot {
+  left: 40.5%;
+  top: 80.5%;
+  width: 26.2%;
+  height: 13.4%;
+}
+
+.create-hotspot {
+  left: 67.1%;
+  top: 80.5%;
+  width: 28.4%;
+  height: 13.4%;
+}
+
+.home-error {
+  position: absolute;
+  left: 36.4%;
+  top: 73.1%;
+  width: 32%;
+  min-height: 22px;
+  margin: 0;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: rgba(16, 8, 4, 0.56);
+  color: #ffd3c9;
+  text-align: center;
+  font: 800 12px/1.2 var(--ui-font);
+}
+
+.home-error:empty {
+  display: none;
+}
+
+.room-waiting-art {
+  position: relative;
+  width: min(calc(100vw - 28px), 980px);
+  height: min(calc(100svh - 24px), 554px);
+  overflow: hidden;
+  border-radius: 10px;
+  background: url("assets/room-bg.png?v=4") center / cover no-repeat;
+  box-shadow: var(--shadow);
+  isolation: isolate;
+}
+
+.room-code-value {
+  position: absolute;
+  left: 42.55%;
+  top: 11.8%;
+  width: 14.9%;
+  margin: 0;
+  color: #fff1b8;
+  font: 800 clamp(8px, 1.5svh, 14px)/1 var(--title-font);
+  text-align: center;
+  letter-spacing: 0.04em;
+  text-shadow:
+    0 2px 0 rgba(71, 31, 6, 0.75),
+    0 0 12px rgba(255, 209, 86, 0.42);
+}
+
+.room-player-stage {
+  position: absolute;
+  inset: 0;
+  display: block;
+  margin: 0;
+  pointer-events: none;
+}
+
+.room-player-card {
+  position: absolute;
+  left: var(--card-x);
+  top: 53.5624%;
+  width: 13.7039%;
+  height: 27.1417%;
+  display: block;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.room-player-card img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  filter: drop-shadow(0 10px 14px rgba(0, 0, 0, 0.42));
+}
+
+.room-player-name {
+  position: absolute;
+  left: 10%;
+  right: 10%;
+  top: 56.8%;
+  overflow: hidden;
+  color: #ffe78b;
+  font: 900 clamp(8px, 1.95svh, 16px)/1.05 var(--title-font);
+  text-align: center;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  text-shadow:
+    0 2px 0 rgba(58, 23, 3, 0.86),
+    0 0 10px rgba(255, 216, 95, 0.38);
+}
+
+.room-player-role {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.room-player-stage[data-count="1"] .room-player-card:nth-child(1) {
+  --card-x: 42.9324%;
+}
+
+.room-player-stage[data-count="2"] .room-player-card:nth-child(1) {
+  --card-x: 34.1639%;
+}
+
+.room-player-stage[data-count="2"] .room-player-card:nth-child(2) {
+  --card-x: 51.7010%;
+}
+
+.room-player-stage[data-count="3"] .room-player-card:nth-child(1) {
+  --card-x: 25.3953%;
+}
+
+.room-player-stage[data-count="3"] .room-player-card:nth-child(2) {
+  --card-x: 42.9324%;
+}
+
+.room-player-stage[data-count="3"] .room-player-card:nth-child(3) {
+  --card-x: 60.4696%;
+}
+
+.room-player-stage[data-count="4"] .room-player-card:nth-child(1) {
+  --card-x: 18.7829%;
+}
+
+.room-player-stage[data-count="4"] .room-player-card:nth-child(2) {
+  --card-x: 34.8826%;
+}
+
+.room-player-stage[data-count="4"] .room-player-card:nth-child(3) {
+  --card-x: 50.9823%;
+}
+
+.room-player-stage[data-count="4"] .room-player-card:nth-child(4) {
+  --card-x: 67.0819%;
+}
+
+.room-hotspot {
+  position: absolute;
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: transparent;
+  font-size: 0;
+  cursor: pointer;
+}
+
+.room-hotspot:focus-visible {
+  outline: 2px solid rgba(255, 238, 178, 0.88);
+  outline-offset: 3px;
+}
+
+.room-hotspot:disabled {
+  cursor: not-allowed;
+}
+
+.room-back-hotspot {
+  left: 30.66%;
+  top: 84.48%;
+  width: 20.25%;
+  height: 9.55%;
+}
+
+.room-start-hotspot {
+  left: 54.14%;
+  top: 84.48%;
+  width: 21.21%;
+  height: 9.55%;
+}
+
+.room-waiting-art .waiting-status {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  margin: 0;
+}
+
+.entry-layout,
+.flow-layout {
+  display: grid;
+  grid-template-columns: minmax(190px, 0.72fr) minmax(360px, 1fr);
+  gap: 14px;
+  align-items: center;
+}
+
+.entry-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 8px;
+  align-content: center;
+  min-width: 0;
+}
+
+.entry-form .brand-block,
+.entry-form .network-card,
+.entry-form .room-rule-note,
+.entry-form .form-error {
+  grid-column: 1 / -1;
+}
+
+.entry-form .primary-action {
+  grid-column: 1;
+}
+
+.logo-showcase {
+  display: grid;
+  place-items: center;
+  align-self: stretch;
+  min-height: 0;
+  height: 100%;
+}
+
+.logo-showcase img {
+  display: block;
+  width: min(100%, 292px);
+  max-height: calc(100svh - 52px);
+  aspect-ratio: 1;
+  object-fit: contain;
+  border-radius: 13px;
+  filter: drop-shadow(0 18px 28px rgba(0, 0, 0, 0.46));
+}
+
 .brand-block {
-  margin-bottom: 22px;
+  margin-bottom: 14px;
+}
+
+.entry-form .brand-block {
+  margin-bottom: 0;
 }
 
 .brand-block h1,
 .waiting-head h1 {
   margin: 0;
   color: var(--gold);
-  font-size: 42px;
+  font-family: var(--title-font);
+  font-size: clamp(30px, 5.5svh, 48px);
   line-height: 1.1;
 }
 
 .brand-block p {
-  margin: 10px 0 0;
+  margin: 8px 0 0;
   color: var(--muted);
-  font-family: "PingFang SC", sans-serif;
+  font-family: var(--ui-font);
   font-size: 14px;
-  line-height: 1.6;
+  line-height: 1.45;
+}
+
+.entry-form .brand-block p {
+  margin-top: 4px;
+  font-size: 13px;
+  line-height: 1.35;
 }
 
 .field {
   display: block;
-  margin-bottom: 14px;
+  margin-bottom: 10px;
+}
+
+.entry-form .field {
+  margin-bottom: 0;
 }
 
 .network-card {
-  margin-bottom: 16px;
-  padding: 12px;
+  margin-bottom: 10px;
+  padding: 10px;
   border: 1px solid rgba(16, 201, 193, 0.3);
   border-radius: 8px;
   background: rgba(16, 201, 193, 0.07);
+}
+
+.entry-form .network-card {
+  margin-bottom: 0;
+  padding: 8px 10px;
 }
 
 .network-card strong,
@@ -134,34 +485,49 @@ input {
 .network-card strong {
   overflow-wrap: anywhere;
   color: #bdfdf9;
-  font-family: "Courier New", monospace;
+  font-family: var(--ui-font);
+  font-weight: 800;
   font-size: 14px;
 }
 
 .network-card small {
   margin-top: 4px;
   color: var(--muted);
-  font-family: "PingFang SC", sans-serif;
+  font-family: var(--ui-font);
   font-size: 12px;
 }
 
-.room-size {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 8px;
+.entry-form input,
+.entry-form .primary-action,
+.entry-form .ghost-action {
+  min-height: 38px;
 }
 
-.room-size-option {
-  min-height: 44px;
-  border: 1px solid rgba(214, 167, 58, 0.34);
+.entry-form .primary-action,
+.entry-form .ghost-action {
+  margin-bottom: 0;
+}
+
+.entry-form .join-row {
+  grid-column: 2;
+  grid-template-columns: minmax(0, 1fr) 76px;
+  align-self: stretch;
+}
+
+.entry-form .form-error {
+  min-height: 0;
+  margin: 0;
+}
+
+.room-rule-note {
+  margin: 0;
+  min-height: 30px;
+  padding: 7px 10px;
+  border: 1px solid rgba(214, 167, 58, 0.22);
   border-radius: 8px;
-  background: rgba(0, 0, 0, 0.18);
   color: var(--muted);
-}
-
-.room-size-option.is-active {
-  color: var(--paper);
-  background: rgba(214, 167, 58, 0.18);
+  background: rgba(214, 167, 58, 0.07);
+  font: 800 12px/1.35 var(--ui-font);
 }
 
 .join-row {
@@ -200,6 +566,7 @@ input {
   display: grid;
   gap: 8px;
   margin-bottom: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .waiting-player {
@@ -221,18 +588,23 @@ input {
 
 .waiting-player small {
   color: var(--muted);
-  font-family: "PingFang SC", sans-serif;
+  font-family: var(--ui-font);
 }
 
 .starter-panel {
   text-align: center;
 }
 
+.starter-panel .flow-layout,
+.money-panel .flow-layout {
+  grid-template-columns: minmax(240px, 0.78fr) minmax(280px, 1fr);
+}
+
 .starter-wheel {
   position: relative;
-  --label-radius: min(36vw, 152px);
+  --label-radius: min(22svh, 132px);
   --ring-bg: conic-gradient(rgba(214, 167, 58, 0.78), rgba(16, 201, 193, 0.72));
-  width: min(84vw, 352px);
+  width: min(52svh, 330px);
   aspect-ratio: 1;
   margin: 8px auto 14px;
   border-radius: 50%;
@@ -296,7 +668,7 @@ input {
   border-radius: 0;
   background: transparent;
   color: #fff7dd;
-  font: 900 16px/1 "PingFang SC", sans-serif;
+  font: 900 16px/1 var(--ui-font);
   text-align: center;
   text-shadow:
     0 2px 5px rgba(0, 0, 0, 0.75),
@@ -304,7 +676,8 @@ input {
   transform:
     translate(-50%, -50%)
     rotate(var(--label-angle))
-    translateY(calc(-1 * var(--label-radius)));
+    translateY(calc(-1 * var(--label-radius)))
+    rotate(var(--label-flip, 0deg));
 }
 
 .starter-name.red {
@@ -331,42 +704,219 @@ input {
   min-height: 26px;
   margin: 0;
   color: var(--paper);
-  font-family: "PingFang SC", sans-serif;
+  font-family: var(--ui-font);
   font-size: 15px;
 }
 
-.money-panel {
-  text-align: left;
+.money-art {
+  position: relative;
+  width: min(calc(100vw - 28px), 980px);
+  height: min(calc(100svh - 24px), 554px);
+  overflow: hidden;
+  border-radius: 10px;
+  background: url("assets/money-4.png?v=1") center / cover no-repeat;
+  box-shadow: var(--shadow);
+  isolation: isolate;
+}
+
+.money-art[data-count="3"] {
+  background-image: url("assets/money-3.png?v=1");
+}
+
+.money-art[data-count="4"] {
+  background-image: url("assets/money-4.png?v=1");
 }
 
 .money-list {
-  display: grid;
-  gap: 10px;
+  position: absolute;
+  inset: 0;
+  display: block;
+  margin: 0;
+  pointer-events: none;
 }
 
-.money-row {
+.money-name {
+  position: absolute;
+  left: 53.55%;
+  top: var(--money-y);
+  width: 11.4%;
+  height: 4.5%;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  min-height: 54px;
-  padding: 0 12px;
-  border: 1px solid rgba(88, 192, 109, 0.28);
-  border-radius: 8px;
-  background: rgba(88, 192, 109, 0.07);
+  place-items: center start;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #ffe68a;
+  font: 900 clamp(11px, 2.1svh, 18px)/1 var(--title-font);
+  letter-spacing: 0;
+  text-shadow:
+    0 2px 0 rgba(46, 18, 4, 0.9),
+    0 0 6px rgba(255, 224, 116, 0.34);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   opacity: 0;
-  transform: translateY(8px);
+  transform: translateY(5px);
   animation: moneyIn 520ms ease forwards;
 }
 
-.money-row strong {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.money-art[data-count="3"] .money-name:nth-child(1) {
+  --money-y: 42.62%;
 }
 
-.money-row b {
-  color: #a8f0b6;
-  font-family: "Courier New", monospace;
+.money-art[data-count="3"] .money-name:nth-child(2) {
+  --money-y: 58.95%;
+}
+
+.money-art[data-count="3"] .money-name:nth-child(3) {
+  --money-y: 75.23%;
+}
+
+.money-art[data-count="4"] .money-name:nth-child(1) {
+  --money-y: 38.68%;
+}
+
+.money-art[data-count="4"] .money-name:nth-child(2) {
+  --money-y: 53.69%;
+}
+
+.money-art[data-count="4"] .money-name:nth-child(3) {
+  --money-y: 68.66%;
+}
+
+.money-art[data-count="4"] .money-name:nth-child(4) {
+  --money-y: 83.72%;
+}
+
+.lot-deal-art {
+  position: relative;
+  width: min(calc(100vw - 28px), 980px);
+  height: min(calc(100svh - 24px), 554px);
+  overflow: hidden;
+  border-radius: 10px;
+  background: url("assets/lot-deal-bg.png?v=1") center / cover no-repeat;
+  box-shadow: var(--shadow);
+  isolation: isolate;
+}
+
+.lot-deal-list {
+  position: absolute;
+  inset: 0;
+  display: block;
+  pointer-events: none;
+}
+
+.lot-deal-card {
+  position: absolute;
+  left: var(--lot-card-x, 45%);
+  top: var(--lot-card-y, 48%);
+  width: 10.06%;
+  aspect-ratio: 420 / 512;
+  opacity: 0;
+  transform: translateY(8%) scale(0.92);
+  filter: drop-shadow(0 12px 18px rgba(0, 0, 0, 0.34));
+  animation: lotDealIn 560ms cubic-bezier(0.19, 1, 0.22, 1) forwards;
+}
+
+.lot-deal-card img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.lot-deal-art[data-count="7"] .lot-deal-card:nth-child(1) {
+  --lot-card-x: 25.25%;
+  --lot-card-y: 36.45%;
+}
+
+.lot-deal-art[data-count="7"] .lot-deal-card:nth-child(2) {
+  --lot-card-x: 38.4%;
+  --lot-card-y: 36.45%;
+}
+
+.lot-deal-art[data-count="7"] .lot-deal-card:nth-child(3) {
+  --lot-card-x: 51.55%;
+  --lot-card-y: 36.45%;
+}
+
+.lot-deal-art[data-count="7"] .lot-deal-card:nth-child(4) {
+  --lot-card-x: 64.7%;
+  --lot-card-y: 36.45%;
+}
+
+.lot-deal-art[data-count="7"] .lot-deal-card:nth-child(5),
+.lot-deal-art[data-count="5"] .lot-deal-card:nth-child(1),
+.lot-deal-art[data-count="6"] .lot-deal-card:nth-child(1),
+.lot-deal-art[data-count="6"] .lot-deal-card:nth-child(4) {
+  --lot-card-x: 31.82%;
+}
+
+.lot-deal-art[data-count="5"] .lot-deal-card:nth-child(1),
+.lot-deal-art[data-count="6"] .lot-deal-card:nth-child(1) {
+  --lot-card-y: 36.45%;
+}
+
+.lot-deal-art[data-count="7"] .lot-deal-card:nth-child(5),
+.lot-deal-art[data-count="6"] .lot-deal-card:nth-child(4) {
+  --lot-card-y: 63.2%;
+}
+
+.lot-deal-art[data-count="7"] .lot-deal-card:nth-child(6),
+.lot-deal-art[data-count="5"] .lot-deal-card:nth-child(2),
+.lot-deal-art[data-count="6"] .lot-deal-card:nth-child(2),
+.lot-deal-art[data-count="6"] .lot-deal-card:nth-child(5) {
+  --lot-card-x: 44.97%;
+}
+
+.lot-deal-art[data-count="5"] .lot-deal-card:nth-child(2),
+.lot-deal-art[data-count="6"] .lot-deal-card:nth-child(2) {
+  --lot-card-y: 36.45%;
+}
+
+.lot-deal-art[data-count="7"] .lot-deal-card:nth-child(6),
+.lot-deal-art[data-count="6"] .lot-deal-card:nth-child(5) {
+  --lot-card-y: 63.2%;
+}
+
+.lot-deal-art[data-count="7"] .lot-deal-card:nth-child(7),
+.lot-deal-art[data-count="5"] .lot-deal-card:nth-child(3),
+.lot-deal-art[data-count="6"] .lot-deal-card:nth-child(3),
+.lot-deal-art[data-count="6"] .lot-deal-card:nth-child(6) {
+  --lot-card-x: 58.12%;
+}
+
+.lot-deal-art[data-count="5"] .lot-deal-card:nth-child(3),
+.lot-deal-art[data-count="6"] .lot-deal-card:nth-child(3) {
+  --lot-card-y: 36.45%;
+}
+
+.lot-deal-art[data-count="7"] .lot-deal-card:nth-child(7),
+.lot-deal-art[data-count="6"] .lot-deal-card:nth-child(6) {
+  --lot-card-y: 63.2%;
+}
+
+.lot-deal-art[data-count="5"] .lot-deal-card:nth-child(4) {
+  --lot-card-x: 38.4%;
+  --lot-card-y: 63.2%;
+}
+
+.lot-deal-art[data-count="5"] .lot-deal-card:nth-child(5) {
+  --lot-card-x: 51.55%;
+  --lot-card-y: 63.2%;
+}
+
+@keyframes lotDealIn {
+  68% {
+    opacity: 1;
+    transform: translateY(-1.5%) scale(1.025);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 @keyframes moneyIn {
@@ -1014,6 +1564,12 @@ input {
   display: block;
 }
 
+#shops.is-active {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: 7px;
+}
+
 .card-row {
   display: flex;
   gap: 10px;
@@ -1056,6 +1612,19 @@ input {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 8px;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+
+.shop-action-row {
+  display: grid;
+  min-height: 0;
+}
+
+.shop-action-row:empty {
+  display: none;
 }
 
 .shop-chip {
@@ -1143,6 +1712,11 @@ input {
   background: rgba(214, 167, 58, 0.08);
 }
 
+.income-card > *,
+.income-row > * {
+  min-width: 0;
+}
+
 .income-card strong,
 .income-row b {
   color: #c8fffb;
@@ -1170,6 +1744,11 @@ input {
   font: 11px/1.3 "PingFang SC", sans-serif;
 }
 
+.income-row small {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
 .income-row.complete {
   border-color: rgba(214, 167, 58, 0.38);
   background: rgba(214, 167, 58, 0.11);
@@ -1184,6 +1763,7 @@ input {
   display: grid;
   grid-column: 1 / -1;
   gap: 4px;
+  min-width: 0;
   padding: 12px 10px;
   border: 1px solid rgba(214, 167, 58, 0.42);
   border-radius: 8px;
@@ -1199,6 +1779,9 @@ input {
 }
 
 .final-card strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   color: #fff4c5;
   font: 900 22px/1.05 "STKaiti", "KaiTi", "PingFang SC", serif;
 }
@@ -1713,7 +2296,38 @@ input {
 }
 
 @media (orientation: portrait) {
-  .game-active .app-shell {
+  body:not(.game-active) .modal-backdrop {
+    top: 0;
+    left: 100vw;
+    width: 100svh;
+    height: 100vw;
+    padding: 12px;
+    place-items: center;
+    transform: rotate(90deg);
+    transform-origin: top left;
+  }
+
+  body:not(.game-active) .hint-modal {
+    width: min(620px, calc(100svh - 24px));
+    max-height: calc(100vw - 24px);
+    overflow: auto;
+  }
+
+  #homeScreen.entry-shell,
+  #waitingScreen.entry-shell,
+  #buildingDealScreen.entry-shell {
+    padding: max(4px, env(safe-area-inset-top)) max(6px, env(safe-area-inset-right)) max(4px, env(safe-area-inset-bottom)) max(6px, env(safe-area-inset-left));
+  }
+
+  .home-art,
+  .room-waiting-art,
+  .money-art,
+  .lot-deal-art {
+    width: calc(100svh - 12px);
+    height: calc(100vw - 8px);
+  }
+
+  .screen.is-active {
     position: fixed;
     top: 0;
     left: 100vw;
@@ -1799,6 +2413,63 @@ input {
   font-family: "PingFang SC", sans-serif;
   font-size: 14px;
   line-height: 1.6;
+}
+
+.rules-panel {
+  display: grid;
+  gap: 10px;
+}
+
+.rules-panel section {
+  padding: 10px;
+  border: 1px solid rgba(214, 167, 58, 0.18);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.rules-panel h3 {
+  margin: 0 0 6px;
+  color: #fff4c5;
+  font: 900 14px/1 var(--ui-font);
+}
+
+.rules-panel p,
+.rules-panel ol {
+  margin: 0;
+  color: var(--muted);
+  font: 12px/1.55 var(--ui-font);
+}
+
+.rules-panel ol {
+  padding-left: 18px;
+}
+
+.join-modal {
+  max-width: 430px;
+}
+
+.join-code-field {
+  display: grid;
+  gap: 6px;
+}
+
+.join-code-field span {
+  color: var(--muted);
+  font: 800 12px/1 var(--ui-font);
+}
+
+.join-code-field input {
+  min-height: 52px;
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0;
+  color: #fff4c5;
+  font: 900 24px/1 var(--ui-font);
+}
+
+.join-error {
+  min-height: 18px;
+  margin: 2px 0 0;
 }
 
 .info-tabs {
@@ -2155,9 +2826,11 @@ input {
 
 .final-modal-hero {
   display: grid;
-  gap: 4px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 16px;
+  align-items: end;
   margin-bottom: 12px;
-  padding: 14px 12px;
+  padding: 16px;
   border: 1px solid rgba(214, 167, 58, 0.48);
   border-radius: 10px;
   background:
@@ -2166,18 +2839,25 @@ input {
 }
 
 .final-modal-hero span {
+  grid-column: 1 / -1;
   color: #f2d59b;
   font: 900 12px/1 "PingFang SC", sans-serif;
 }
 
 .final-modal-hero strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   color: #fff7d0;
-  font: 900 28px/1.05 "STKaiti", "KaiTi", "PingFang SC", serif;
+  font: 900 30px/1.05 var(--ui-font);
 }
 
 .final-modal-hero b {
+  justify-self: end;
+  white-space: nowrap;
   color: #c8fffb;
-  font: 900 15px/1 "PingFang SC", sans-serif;
+  font: 900 25px/1 var(--ui-font);
 }
 
 .final-rank-list {
@@ -2189,10 +2869,11 @@ input {
 
 .final-rank-card {
   display: grid;
-  grid-template-columns: 30px 24px minmax(0, 1fr) auto;
-  gap: 8px;
-  align-items: center;
-  padding: 8px;
+  grid-column: 1 / -1;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+  min-width: 0;
+  padding: 12px 14px;
   border: 1px solid rgba(214, 167, 58, 0.22);
   border-radius: 8px;
   background: rgba(0, 0, 0, 0.18);
@@ -2203,34 +2884,38 @@ input {
   background: rgba(214, 167, 58, 0.12);
 }
 
-.final-rank-medal {
+.final-rank-main,
+.final-rank-stats {
   display: grid;
-  place-items: center;
-  width: 28px;
-  height: 28px;
-  border: 1px solid rgba(214, 167, 58, 0.42);
-  border-radius: 50%;
-  color: #fff4c5;
-  background: rgba(214, 167, 58, 0.14);
-  font: 900 12px/1 "PingFang SC", sans-serif;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
 }
 
 .final-rank-card strong {
   display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   color: var(--paper);
   font: 900 13px/1.15 "PingFang SC", sans-serif;
 }
 
-.final-rank-card small {
-  display: block;
-  margin-top: 3px;
-  color: var(--muted);
-  font: 11px/1.25 "PingFang SC", sans-serif;
+.final-rank-stats {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
-.final-rank-card b {
+.final-rank-stats span {
+  min-width: 0;
+  color: var(--muted);
+  font: 800 13px/1 var(--ui-font);
+}
+
+.final-rank-main b {
+  justify-self: end;
+  white-space: nowrap;
   color: #c8fffb;
-  font: 900 13px/1 "PingFang SC", sans-serif;
+  font: 900 18px/1 var(--ui-font);
 }
 
 @media (min-width: 700px) {
@@ -2521,6 +3206,15 @@ input {
   color: var(--muted);
   border-style: dashed;
   background: rgba(255, 255, 255, 0.03);
+  white-space: nowrap;
+}
+
+.player-shop-list .mini-empty {
+  grid-column: 1 / -1;
+  justify-self: start;
+  width: max-content;
+  max-width: 100%;
+  padding: 0 8px;
 }
 
 .map-shop-list {
@@ -2574,14 +3268,25 @@ input {
 }
 
 @media (orientation: portrait) {
-  .game-active #gameScreen.app-shell {
-    position: fixed;
+  body:not(.game-active) .modal-backdrop {
     top: 0;
     left: 100vw;
     width: 100svh;
     height: 100vw;
+    padding: 12px;
+    place-items: center;
     transform: rotate(90deg);
     transform-origin: top left;
+  }
+
+  body:not(.game-active) .hint-modal {
+    width: min(620px, calc(100svh - 24px));
+    max-height: calc(100vw - 24px);
+    overflow: auto;
+  }
+
+  .game-active #gameScreen.app-shell {
+    position: fixed;
   }
 
   .game-active #gameScreen .bottom-drawer {
@@ -2788,10 +3493,51 @@ input {
 
 #gameScreen .shop-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-auto-rows: minmax(70px, max-content);
   align-content: start;
   height: 100%;
   gap: 7px;
   overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 2px;
+}
+
+#gameScreen .shop-card {
+  min-height: 70px;
+}
+
+#gameScreen .shop-action-row {
+  flex: 0 0 auto;
+}
+
+#gameScreen .shop-action-row .shop-confirm {
+  width: 100%;
+}
+
+#gameScreen .final-card {
+  padding: 8px 9px;
+  gap: 2px;
+}
+
+#gameScreen .final-card strong {
+  font: 900 19px/1.05 var(--ui-font);
+}
+
+#gameScreen .final-rank-card.side-final {
+  gap: 7px;
+  padding: 9px;
+}
+
+#gameScreen .final-rank-card.side-final .final-rank-main b {
+  font-size: 15px;
+}
+
+#gameScreen .final-rank-card.side-final .final-rank-stats {
+  gap: 6px;
+}
+
+#gameScreen .final-rank-card.side-final .final-rank-stats span {
+  font-size: 11px;
 }
 
 #gameScreen .floating-trade {
@@ -2805,9 +3551,16 @@ input {
 
 @media (orientation: portrait) {
   .game-active #gameScreen.app-shell {
+    position: fixed;
+    top: 0;
+    left: 100vw;
     display: grid;
+    width: 100svh;
+    height: 100vw;
     grid-template-columns: minmax(0, 1fr) clamp(168px, 21vw, 218px);
     grid-template-rows: minmax(0, 1fr);
+    transform: rotate(90deg);
+    transform-origin: top left;
   }
 
   .game-active #gameScreen .bottom-drawer {
