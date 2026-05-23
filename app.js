@@ -1264,26 +1264,34 @@ function showBuildingDealIntro() {
   lotDealList.innerHTML = "";
   lotDealArt.dataset.count = String(cards.length);
 
+  if (!cards.length) {
+    showBuildingDraft();
+    return;
+  }
+
+  let loaded = 0;
+  const total = cards.length;
+
   cards.forEach((lotId, index) => {
     const card = document.createElement("article");
     card.className = "lot-deal-card";
     card.style.animationDelay = `${index * 95}ms`;
 
     const image = document.createElement("img");
-    image.src = lotCardImagePath(lotId);
     image.alt = `${lotId}号地块`;
-    card.appendChild(image);
 
+    image.onload = image.onerror = () => {
+      loaded++;
+      if (loaded === total) {
+        showScreen(buildingDealScreen);
+        window.setTimeout(showBuildingDraft, 1180 + cards.length * 115);
+      }
+    };
+
+    image.src = lotCardImagePath(lotId);
+    card.appendChild(image);
     lotDealList.appendChild(card);
   });
-
-  if (!cards.length) {
-    showBuildingDraft();
-    return;
-  }
-
-  showScreen(buildingDealScreen);
-  window.setTimeout(showBuildingDraft, 1180 + cards.length * 115);
 }
 
 function showBuildingDraft() {
