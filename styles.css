@@ -109,7 +109,7 @@ input {
   border-radius: 10px;
   background:
     linear-gradient(180deg, rgba(0, 0, 0, 0.06), rgba(0, 0, 0, 0.18)),
-    url("assets/chinatown-home.png?v=4") center / cover no-repeat;
+    url("assets/chinatown-home.webp?v=4") center / cover no-repeat;
   box-shadow: var(--shadow);
 }
 
@@ -125,7 +125,7 @@ input {
 }
 
 .home-name-field input {
-  min-height: 0;
+  min-height: 0;111
   height: 100%;
   border: 0;
   padding: 0 3%;
@@ -218,7 +218,7 @@ input {
   height: min(calc(100svh - 24px), 554px);
   overflow: hidden;
   border-radius: 10px;
-  background: url("assets/room-bg.png?v=4") center / cover no-repeat;
+  background: url("assets/room-bg.webp?v=4") center / cover no-repeat;
   box-shadow: var(--shadow);
   isolation: isolate;
 }
@@ -632,7 +632,7 @@ input {
   position: absolute;
   inset: 19%;
   border-radius: 50%;
-  background: transparent url("assets/spinner-wheel.png?v=1") center / contain no-repeat;
+  background: transparent url("assets/spinner-wheel.webp?v=1") center / contain no-repeat;
   filter: drop-shadow(0 16px 32px rgba(0, 0, 0, 0.44));
 }
 
@@ -714,17 +714,17 @@ input {
   height: min(calc(100svh - 24px), 554px);
   overflow: hidden;
   border-radius: 10px;
-  background: url("assets/money-4.png?v=1") center / cover no-repeat;
+  background: url("assets/money-4.webp?v=2") center / cover no-repeat;
   box-shadow: var(--shadow);
   isolation: isolate;
 }
 
 .money-art[data-count="3"] {
-  background-image: url("assets/money-3.png?v=1");
+  background-image: url("assets/money-3.webp?v=2");
 }
 
 .money-art[data-count="4"] {
-  background-image: url("assets/money-4.png?v=1");
+  background-image: url("assets/money-4.webp?v=2");
 }
 
 .money-list {
@@ -795,7 +795,7 @@ input {
   height: min(calc(100svh - 24px), 554px);
   overflow: hidden;
   border-radius: 10px;
-  background: url("assets/lot-deal-bg.png?v=1") center / cover no-repeat;
+  background: url("assets/lot-deal-bg.webp?v=2") center / cover no-repeat;
   box-shadow: var(--shadow);
   isolation: isolate;
 }
@@ -1166,7 +1166,7 @@ input {
   aspect-ratio: 2028 / 1404;
   border-radius: 10px;
   overflow: hidden;
-  background: #120b05 url("assets/map.png?v=round-sync-4") center / 100% 100% no-repeat;
+  background: #120b05 url("assets/map.webp?v=round-sync-5") center / 100% 100% no-repeat;
 }
 
 .cell {
